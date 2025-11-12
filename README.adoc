@@ -57,20 +57,19 @@ make consumer  # Terminal 2
 
 See link:samples/README.adoc[all samples] for more examples.
 
-=== Local Development
+=== Run Locally with Docker
 
-*Prerequisites:* JDK 17+, Redis, Gradle 8.5+ (or use included wrapper)
+*Prerequisites:* Docker
 
 [source,bash]
 ----
-# Build the project
-./gradlew clean build
-
 # Start Redis
-docker compose up -d redis
+docker run -d -p 6379:6379 redis
 
 # Run Korvet server
-./gradlew bootRun
+docker run -d -p 9092:9092 -p 8080:8080 \
+  -e KORVET_REDIS_HOST=host.docker.internal \
+  redisfield/korvet
 ----
 
 === Configuration
