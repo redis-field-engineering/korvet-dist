@@ -215,7 +215,12 @@ docker-compose down -v
 
 === Korvet Image Not Found
 
-If you see `image korvet not found`, you need to build Korvet first. See "Building Korvet Locally" above.
+Docker will automatically pull `redisfield/korvet` on first run. If you see this error, try:
+
+[source,bash]
+----
+docker pull redisfield/korvet
+----
 
 === Port Already in Use
 
