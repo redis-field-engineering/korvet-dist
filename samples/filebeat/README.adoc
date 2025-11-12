@@ -53,11 +53,6 @@ This demonstrates Korvet's ability to handle both producers (Filebeat) and consu
 
 * Docker and Docker Compose
 * At least 4GB of available memory (for Filebeat, Logstash, Korvet, and Redis)
-* Java 17+ (for building Korvet image)
-
-== Building Korvet
-
-The sample uses the official `redisfield/korvet` Docker image from Docker Hub. No build step required!
 
 == Quick Start
 

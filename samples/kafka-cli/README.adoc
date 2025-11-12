@@ -30,7 +30,7 @@ cd samples/kafka-cli
 make up
 ----
 
-NOTE: `make up` automatically builds the Korvet image if needed (takes 2-3 minutes first time). Wait 10-15 seconds for services to initialize.
+NOTE: Wait 10-15 seconds for services to initialize. Docker will automatically pull the `redisfield/korvet` image on first run.
 
 === 2. Interactive Demo
 
@@ -67,7 +67,7 @@ make down
 [source,bash]
 ----
 make help       # Show all available commands
-make up         # Start services (builds image if needed)
+make up         # Start services
 make down       # Stop services
 make producer   # Start interactive producer
 make consumer   # Start interactive consumer

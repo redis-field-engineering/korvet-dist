@@ -60,12 +60,12 @@ A simplified version of the streaming-pacman demo that showcases **Korvet** (Kaf
 [source,bash]
 ----
 cd samples/pacman
-docker compose up -d --build
+docker compose up -d
 ----
 
 That's it! Docker Compose will:
 
-* ✅ Build Korvet from source
+* ✅ Pull the official `redisfield/korvet` image from Docker Hub
 * ✅ Start Redis, Korvet, web server, and consumer
 * ✅ Install Node.js dependencies automatically
 * ✅ Make everything available in ~30 seconds
@@ -464,8 +464,8 @@ If all else fails, do a clean restart:
 # Stop everything and remove volumes
 docker compose down -v
 
-# Rebuild and start fresh
-docker compose up -d --build
+# Start fresh
+docker compose up -d
 ----
 
 === Debugging Commands
