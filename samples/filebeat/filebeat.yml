@@ -1,0 +1,123 @@
+# Filebeat Configuration for Korvet Sample
+#
+# This configuration monitors JSON log files and sends them to Korvet
+# using the Kafka output protocol.
+
+# ============================= Filebeat Inputs ================================
+
+filebeat.inputs:
+  # Monitor application log files
+  - type: filestream
+    id: sample-app-logs
+    enabled: true
+    
+    # Path to log files
+    paths:
+      - /logs/*.log
+    
+    # Parse JSON logs
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+          overwrite_keys: false
+    
+    # Add custom fields
+    fields:
+      environment: development
+      sample: filebeat-korvet
+    fields_under_root: false
+    
+    # Scan for new files frequently
+    prospector.scanner.check_interval: 1s
+    
+    # Close inactive files after 30 seconds
+    close.on_state_change.inactive: 30s
+
+# ============================= Kafka Output ===================================
+
+output.kafka:
+  # Korvet server endpoint (Kafka-compatible)
+  hosts: ["korvet:9092"]
+  
+  # Topic name - will be created automatically in Korvet
+  topic: "filebeat-logs"
+  
+  # Kafka protocol version (Korvet supports Kafka 2.x protocol)
+  version: "2.0.0"
+  
+  # Reliability settings
+  required_acks: 1  # Wait for leader acknowledgment
+  compression: none  # No compression for simplicity
+  max_message_bytes: 1000000  # 1MB max message size
+  
+  # Performance settings
+  bulk_max_size: 2048  # Max events per batch
+  worker: 1  # Number of concurrent workers
+  
+  # Retry configuration
+  max_retries: 3
+  backoff.init: 1s
+  backoff.max: 60s
+  
+  # Client ID for debugging
+  client_id: "filebeat-sample"
+
+# ============================= Processors =====================================
+
+processors:
+  # Add host metadata
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+      netinfo.enabled: false
+      cache.ttl: 5m
+  
+  # Add Docker metadata if available
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+      match_fields: ["container.id"]
+      match_pids: ["process.pid", "process.parent.pid"]
+  
+  # Add timestamp if not present
+  - timestamp:
+      field: timestamp
+      layouts:
+        - '2006-01-02T15:04:05Z'
+        - '2006-01-02T15:04:05.999Z'
+        - '2006-01-02T15:04:05.999999Z'
+      test:
+        - '2025-10-08T10:30:45Z'
+      ignore_missing: true
+
+# ============================= Logging ========================================
+
+logging.level: debug
+logging.to_stderr: true
+logging.to_files: false
+
+# Enable debug logging for Kafka output (useful for troubleshooting)
+logging.selectors: ["kafka", "publisher"]
+
+# ============================= Monitoring =====================================
+
+# Disable monitoring for this sample
+monitoring.enabled: false
+
+# HTTP endpoint for metrics (optional)
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5066
+
+# ============================= General ========================================
+
+# Name of the Beat
+name: "filebeat-sample"
+
+# Tags to include in events
+tags: ["korvet-sample", "filebeat", "development"]
+
+# Fields to add to all events
+fields:
+  project: korvet
+  sample_type: filebeat-integration
+

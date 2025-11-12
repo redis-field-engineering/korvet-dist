@@ -1,0 +1,390 @@
+= Filebeat & Logstash Sample with Korvet
+:toc:
+:icons: font
+
+== Overview
+
+This sample demonstrates a complete log processing pipeline using Korvet as a Kafka-compatible streaming service. The setup includes:
+
+* **Redis**: Backend storage for Korvet
+* **Korvet Server**: Kafka-compatible streaming service
+* **Filebeat**: Log shipper that sends logs to Korvet (Kafka producer)
+* **Logstash**: Log processor that consumes from Korvet (Kafka consumer)
+* **Log Generator**: Simple script that generates sample application logs
+
+This demonstrates Korvet's ability to handle both producers (Filebeat) and consumers (Logstash) simultaneously, providing a complete streaming data pipeline.
+
+== Architecture
+
+[source]
+----
+┌─────────────────┐
+│  Log Generator  │ (generates sample logs)
+└────────┬────────┘
+         │ writes to /logs/*.log
+         ▼
+┌─────────────────┐
+│    Filebeat     │ (Kafka producer - reads logs, sends to Korvet)
+└────────┬────────┘
+         │ Kafka protocol (port 9092)
+         ▼
+┌─────────────────┐
+│ Korvet Server   │ (Kafka-compatible API)
+└────────┬────────┘
+         │ Redis Streams
+         ▼
+┌─────────────────┐
+│     Redis       │ (storage backend)
+└─────────────────┘
+         │
+         │ Kafka protocol (port 9092)
+         ▼
+┌─────────────────┐
+│    Logstash     │ (Kafka consumer - processes and outputs logs)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Output Files   │ (processed-logs.json, errors.json, slow-requests.json)
+└─────────────────┘
+----
+
+== Prerequisites
+
+* Docker and Docker Compose
+* At least 4GB of available memory (for Filebeat, Logstash, Korvet, and Redis)
+* Java 17+ (for building Korvet image)
+
+== Building Korvet
+
+The sample uses the official `redisfield/korvet` Docker image from Docker Hub. No build step required!
+
+== Quick Start
+
+. Start all services:
++
+[source,bash]
+----
+cd samples/filebeat
+docker-compose up -d
+----
+
+. Verify it's working:
++
+[source,bash]
+----
+# Check service status
+make status
+
+# Check Redis statistics and message counts
+make redis-stats
+----
+
+. Watch the logs:
++
+[source,bash]
+----
+# Watch all services
+docker-compose logs -f
+
+# Or use Makefile shortcuts
+make logs              # All services
+make logs-filebeat     # Filebeat only
+make logs-logstash     # Logstash only
+make logs-korvet       # Korvet only
+----
+
+. Check data in Redis:
++
+[source,bash]
+----
+# Connect to Redis CLI
+docker-compose exec redis redis-cli
+
+# Or use Makefile
+make redis-cli
+
+# Inside Redis CLI:
+KEYS "default:*"                              # List all topics
+XLEN "default:filebeat-logs:0"                # Count messages
+XRANGE "default:filebeat-logs:0" - + COUNT 10 # Read first 10 messages
+XINFO GROUPS "default:filebeat-logs:0"        # Check consumer groups
+----
+
+. View Logstash processed output:
++
+[source,bash]
+----
+# View all processed logs
+docker-compose exec logstash cat /output/processed-logs.json | tail -20
+
+# View error logs only
+docker-compose exec logstash cat /output/errors.json 2>/dev/null | tail -10
+
+# View slow requests only
+docker-compose exec logstash cat /output/slow-requests.json 2>/dev/null | tail -10
+----
+
+. Stop all services:
++
+[source,bash]
+----
+# Stop services
+docker-compose down
+
+# Stop and delete all data
+docker-compose down -v
+
+# Or use Makefile
+make down    # Stop services
+make clean   # Stop and remove volumes
+----
+
+== What's Happening
+
+This demo shows a complete streaming data pipeline:
+
+. **Log Generator** creates sample JSON logs every 2 seconds in `/logs/app.log`
+. **Filebeat** (Producer) monitors the log file and ships new entries to Korvet via Kafka protocol
+. **Korvet** (Broker) receives the Kafka Produce requests and stores messages in Redis Streams
+. **Redis** (Storage) stores the messages in a stream with key `default:filebeat-logs:0`
+. **Logstash** (Consumer) reads messages from Korvet using Kafka consumer protocol
+. **Logstash** processes the messages:
+   - Adds metadata (`processed_by`, `processed_at`, `pipeline`)
+   - Parses timestamps
+   - Adds severity levels and tags based on log level
+   - Flags slow requests (> 300ms)
+   - Outputs to multiple files based on content
+. **Output Files** contain processed logs in JSON format
+
+== Sample Log Format
+
+The log generator creates JSON logs like this:
+
+[source,json]
+----
+{
+  "timestamp": "2025-10-08T10:30:45Z",
+  "level": "INFO",
+  "service": "web-api",
+  "message": "User login successful",
+  "user_id": "user-12345",
+  "request_id": "req-67890",
+  "duration_ms": 145
+}
+----
+
+== Configuration Files
+
+=== Filebeat Configuration
+
+See `filebeat.yml` for the complete configuration. Key settings:
+
+* **Input**: Monitors `/logs/*.log` files with JSON parsing
+* **Output**: Sends to Korvet at `korvet:9092` using Kafka protocol
+* **Topic**: `filebeat-logs`
+* **Format**: JSON with keys under root
+
+=== Korvet Configuration
+
+Korvet uses the default configuration with:
+
+* **Port**: 9092 (Kafka protocol)
+* **Redis**: Connected to `redis:6379`
+* **Message Format**: AUTO (auto-detects JSON)
+
+=== Logstash Configuration
+
+Logstash is configured in `logstash.conf` with:
+
+* **Input**: Kafka consumer reading from `filebeat-logs` topic
+* **Consumer Group**: `logstash-consumer-group`
+* **Filters**:
+  - Adds processing metadata
+  - Parses timestamps
+  - Adds severity levels based on log level
+  - Tags slow requests (> 300ms)
+  - Tags user activity
+* **Outputs**:
+  - `processed-logs.json`: All processed messages
+  - `errors.json`: ERROR level messages only
+  - `slow-requests.json`: Requests with duration > 300ms
+  - `stdout`: Debug output (visible in logs)
+
+== Customization
+
+=== Change Log Generation Rate
+
+Edit `docker-compose.yml` and modify the log generator command:
+
+[source,yaml]
+----
+command: sh -c "while true; do ...; sleep 5; done"  # Change from 2 to 5 seconds
+----
+
+=== Change Topic Name
+
+Edit `filebeat.yml`:
+
+[source,yaml]
+----
+output.kafka:
+  topic: "my-custom-topic"  # Change from filebeat-logs
+----
+
+And update `logstash.conf`:
+
+[source,ruby]
+----
+input {
+  kafka {
+    topics => ["my-custom-topic"]  # Match Filebeat topic
+    ...
+  }
+}
+----
+
+=== Add More Log Fields
+
+Edit the log generator in `docker-compose.yml` to add custom fields:
+
+[source,bash]
+----
+echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"custom_field\":\"value\",...}" >> /logs/app.log
+----
+
+== Makefile Commands
+
+For convenience, use the included Makefile:
+
+[source,bash]
+----
+make help            # Show all available commands
+make up              # Start all services
+make down            # Stop all services
+make clean           # Stop services and remove volumes
+make status          # Show service status
+make redis-stats     # Show Redis statistics and message counts
+make logs            # Follow all logs
+make logs-korvet     # Follow Korvet logs
+make logs-filebeat   # Follow Filebeat logs
+make logs-logstash   # Follow Logstash logs
+make redis-cli       # Connect to Redis CLI
+make tail-logs       # Tail the generated log file
+----
+
+== Troubleshooting
+
+=== Korvet Image Not Found
+
+The sample uses `redisfield/korvet` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
+
+[source,bash]
+----
+docker pull redisfield/korvet
+----
+
+=== No Messages in Redis
+
+Wait 10-15 seconds for services to start, then:
+
+[source,bash]
+----
+# Check Filebeat logs
+docker-compose logs filebeat | grep -i error
+
+# Check Korvet logs
+docker-compose logs korvet | grep -i error
+
+# Verify log files are being created
+docker-compose exec filebeat ls -la /logs/
+
+# Test Filebeat configuration
+docker-compose exec filebeat filebeat test config
+docker-compose exec filebeat filebeat test output
+----
+
+=== Logstash Not Consuming Messages
+
+[source,bash]
+----
+# Check Logstash connection
+docker-compose logs logstash | grep -i "kafka\|consumer"
+
+# Verify consumer group exists
+docker-compose exec redis redis-cli XINFO GROUPS "default:filebeat-logs:0"
+
+# Check output files
+docker-compose exec logstash ls -la /output/
+
+# Test Logstash configuration
+docker-compose exec logstash /usr/share/logstash/bin/logstash --config.test_and_exit -f /usr/share/logstash/pipeline/logstash.conf
+----
+
+=== Port Already in Use
+
+Edit `docker-compose.yml` and change port mappings.
+
+== Advanced Topics
+
+=== Performance Characteristics
+
+* **Throughput**: Korvet can handle 100K+ events/sec
+* **Latency**: End-to-end latency ~2-3 seconds (dominated by Filebeat scan interval)
+* **Resource Usage**: ~400MB total memory for all services
+
+=== Monitoring
+
+**Korvet Health & Metrics**:
+[source,bash]
+----
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/prometheus
+----
+
+**Redis Stats**:
+[source,bash]
+----
+docker-compose exec redis redis-cli INFO stats
+make redis-stats
+----
+
+**Filebeat Metrics**:
+[source,bash]
+----
+curl http://localhost:5066/stats
+----
+
+=== Customization
+
+**Change log generation rate** - Edit `docker-compose.yml`:
+[source,yaml]
+----
+command: sh -c "while true; do ...; sleep 5; done"  # Change from 2 to 5 seconds
+----
+
+**Change topic name** - Edit `filebeat.yml` and `logstash.conf`:
+[source,yaml]
+----
+output.kafka:
+  topic: "my-custom-topic"
+----
+
+**Add more log fields** - Edit log generator in `docker-compose.yml`.
+
+== Key Concepts Demonstrated
+
+* **Producer-Broker-Consumer Pattern**: Filebeat produces, Korvet brokers, Logstash consumes
+* **Consumer Groups**: Logstash uses a consumer group for offset tracking
+* **Offset Management**: Korvet tracks consumer offsets in Redis
+* **Message Persistence**: Messages are stored in Redis Streams
+* **Protocol Compatibility**: Both Filebeat and Logstash use standard Kafka protocol
+* **Horizontal Scalability**: Multiple Logstash instances can join the same consumer group
+
+== See Also
+
+* link:../../README.adoc[Korvet Project README]
+* link:../README.adoc[All Samples]
+* https://www.elastic.co/guide/en/beats/filebeat/current/index.html[Filebeat Documentation]
+* https://www.elastic.co/guide/en/logstash/current/index.html[Logstash Documentation]
+

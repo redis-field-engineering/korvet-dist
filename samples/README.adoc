@@ -1,0 +1,276 @@
+= Korvet Samples
+:toc:
+:icons: font
+
+== Overview
+
+This directory contains sample configurations and Docker Compose setups demonstrating how to use Korvet with various data sources and clients.
+
+== Available Samples
+
+=== link:kafka-cli/README.adoc[Kafka CLI Tools Demo] ⭐ **START HERE**
+
+The **simplest and fastest** way to demo Korvet using standard Kafka command-line tools.
+
+**Includes:**
+
+* Redis backend storage
+* Korvet server with Kafka protocol
+* Kafka console producer/consumer
+* Makefile with convenient commands
+
+**Use Cases:**
+
+* Quick demos and POCs
+* Testing Kafka protocol compatibility
+* Learning Korvet basics
+* Developer onboarding
+
+**Demo time:** 2 minutes
+
+**Quick Start:**
+
+[source,bash]
+----
+cd kafka-cli
+make up
+make producer  # In terminal 1
+make consumer  # In terminal 2
+----
+
+=== link:spark-streaming/README.adoc[Spark Streaming Demo]
+
+Demonstrates Apache Spark Structured Streaming reading from Korvet using the Kafka API.
+
+**Includes:**
+
+* Redis backend storage
+* Korvet server with Kafka protocol
+* Apache Spark cluster (master + worker)
+* PySpark streaming application
+* Automated data generator
+* Multiple streaming queries (raw events, aggregations, Parquet writes)
+
+**Use Cases:**
+
+* Real-time stream processing
+* Windowed aggregations
+* Data lake integration
+* Complex event processing
+* Machine learning on streaming data
+
+**Demo time:** 5 minutes
+
+**Quick Start:**
+
+[source,bash]
+----
+cd spark-streaming
+make up
+make demo
+----
+
+=== link:filebeat/README.adoc[Filebeat Sample]
+
+Demonstrates log shipping from Filebeat to Korvet using the Kafka protocol.
+
+**Includes:**
+
+* Redis backend storage
+* Korvet server with Kafka protocol
+* Filebeat configured to ship JSON logs
+* Logstash consumer for processing
+* Automated log generator for testing
+
+**Use Cases:**
+
+* Application log aggregation
+* System log collection
+* Container log shipping
+* Real-time log streaming
+
+**Quick Start:**
+
+[source,bash]
+----
+cd filebeat
+docker compose up -d
+----
+
+== Prerequisites
+
+All samples require:
+
+* Docker 20.10+
+* Docker Compose 2.0+
+* At least 2GB available memory
+
+== Building Korvet
+
+The samples use the official `redisfield/korvet` Docker image from Docker Hub. No build step required!
+
+=== Run the Sample
+
+[source,bash]
+----
+cd samples/filebeat
+docker-compose up -d
+----
+
+=== Alternative: Run Korvet Locally (Without Docker)
+
+If you prefer to run Korvet outside Docker for development:
+
+. Start Redis:
++
+[source,bash]
+----
+docker run -d -p 6379:6379 redis
+----
+
+. Run Korvet from source:
++
+[source,bash]
+----
+./gradlew bootRun
+----
+
+. Modify the sample's `docker-compose.yml`:
++
+[source,yaml]
+----
+# Comment out the korvet service
+# korvet:
+#   image: redisfield/korvet
+#   ...
+
+# Update Filebeat to connect to host machine
+filebeat:
+  ...
+  extra_hosts:
+    - "korvet:host.docker.internal"
+----
+
+== Sample Structure
+
+Each sample directory contains:
+
+* `README.adoc` - Detailed documentation
+* `docker-compose.yml` - Docker Compose configuration
+* `Makefile` - Convenient commands for common tasks
+* Configuration files (e.g., `filebeat.yml`, `logstash.conf`)
+
+== Common Tasks
+
+=== View Logs
+
+[source,bash]
+----
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f korvet
+docker-compose logs -f filebeat
+----
+
+=== Check Redis Data
+
+[source,bash]
+----
+# Connect to Redis
+docker-compose exec redis redis-cli
+
+# List all topics (keys)
+KEYS "default:*"
+
+# Check message count
+XLEN "default:filebeat-logs:0"
+
+# Read messages
+XRANGE "default:filebeat-logs:0" - + COUNT 10
+----
+
+=== Restart Services
+
+[source,bash]
+----
+# Restart all
+docker-compose restart
+
+# Restart specific service
+docker-compose restart korvet
+----
+
+=== Clean Up
+
+[source,bash]
+----
+# Stop and remove containers, networks
+docker-compose down
+
+# Also remove volumes (deletes all data)
+docker-compose down -v
+----
+
+== Troubleshooting
+
+=== Korvet Image Not Found
+
+If you see `image korvet not found`, you need to build Korvet first. See "Building Korvet Locally" above.
+
+=== Port Already in Use
+
+If ports 6379 or 9092 are already in use, modify the `docker-compose.yml` port mappings:
+
+[source,yaml]
+----
+ports:
+  - "16379:6379"  # Use port 16379 instead of 6379
+  - "19092:9092"  # Use port 19092 instead of 9092
+----
+
+=== Services Not Starting
+
+Check service health:
+
+[source,bash]
+----
+docker-compose ps
+docker-compose logs
+----
+
+=== Connection Issues
+
+Verify network connectivity:
+
+[source,bash]
+----
+# Check if Korvet is listening
+docker-compose exec korvet netstat -tlnp | grep 9092
+
+# Test Redis connection
+docker-compose exec redis redis-cli PING
+----
+
+== Next Steps
+
+* Explore the link:filebeat/README.adoc[Filebeat sample]
+* Explore the link:spark-streaming/README.adoc[Spark Streaming sample]
+* Explore the link:pacman/README.adoc[Pac-Man game sample]
+* Try modifying configurations to experiment with different settings
+
+== Contributing
+
+To add a new sample:
+
+. Create a new directory under `samples/`
+. Include a `README.adoc` with detailed documentation
+. Provide a `docker-compose.yml` for easy setup
+. Add configuration files with comments
+. Update this README to list the new sample
+
+== See Also
+
+* link:../README.adoc[Korvet Project README]
+

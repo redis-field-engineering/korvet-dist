@@ -1,0 +1,80 @@
+services:
+  # Redis - Backend storage for Korvet
+  redis:
+    image: redis
+    container_name: korvet-spark-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Korvet Server - Kafka-compatible streaming service
+  korvet:
+    image: redisfield/korvet
+    container_name: korvet-spark-server
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      - KORVET_REDIS_HOST=redis
+      - KORVET_REDIS_PORT=6379
+      - KORVET_SERVER_HOST=0.0.0.0
+      - KORVET_SERVER_PORT=9092
+      - KORVET_SERVER_ADVERTISED_HOST=korvet
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Spark Master
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: korvet-spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "8081:8080"  # Spark Master Web UI
+      - "7077:7077"  # Spark Master port
+      - "4040:4040"  # Spark Application UI (when running spark-submit)
+    volumes:
+      - ./streaming_reader.py:/opt/spark-apps/streaming_reader.py
+      - ./data:/opt/spark-data
+      - spark-ivy-cache:/home/spark/.ivy2
+
+  # Spark Worker
+  spark-worker:
+    image: apache/spark:3.5.0
+    container_name: korvet-spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    volumes:
+      - ./streaming_reader.py:/opt/spark-apps/streaming_reader.py
+      - ./data:/opt/spark-data
+
+  # Data Generator - Produces sample events to Korvet
+  data-generator:
+    image: apache/kafka
+    container_name: korvet-spark-generator
+    depends_on:
+      - korvet
+    volumes:
+      - ./generate-data.sh:/generate-data.sh
+    entrypoint: ["/bin/bash", "/generate-data.sh"]
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=korvet:9092
+
+networks:
+  default:
+    name: korvet-spark-network
+
+volumes:
+  spark-ivy-cache:
+    driver: local

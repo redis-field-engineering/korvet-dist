@@ -1,0 +1,643 @@
+= Streaming Pac-Man with Korvet
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+A simplified version of the streaming-pacman demo that showcases **Korvet** (Kafka-on-Redis) as a drop-in replacement for Apache Kafka.
+
+== What This Demonstrates
+
+✅ **Korvet masquerading as Kafka** - Standard Kafka clients work without code changes +
+✅ **Event-driven** - Pac-Man game events streamed in real-time +
+✅ **Producer & Consumer** - See events flowing through Korvet +
+✅ **Redis backend** - All data stored in Redis Streams +
+✅ **Zero cloud dependencies** - Runs entirely locally
+
+== Architecture
+
+[source,text]
+----
+┌─────────────────┐
+│  Pac-Man Game   │ (Browser)
+│  (HTML/JS)      │
+└────────┬────────┘
+         │ HTTP POST
+         ▼
+┌─────────────────┐
+│  Node.js API    │ (localhost:3000)
+│  (Express)      │
+└────────┬────────┘
+         │ Kafka Protocol
+         ▼
+┌─────────────────┐
+│     Korvet      │ (localhost:9092)
+│ (Kafka-on-Redis)│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│     Redis       │ (localhost:6379)
+│   (Streams)     │
+└─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Event Consumer  │ (Terminal)
+│ (Node.js)       │
+└─────────────────┘
+----
+
+== Quick Start
+
+=== Prerequisites
+
+* Docker and Docker Compose
+* Web browser
+
+=== Start the Demo
+
+[source,bash]
+----
+cd samples/pacman
+docker compose up -d --build
+----
+
+That's it! Docker Compose will:
+
+* ✅ Build Korvet from source
+* ✅ Start Redis, Korvet, web server, and consumer
+* ✅ Install Node.js dependencies automatically
+* ✅ Make everything available in ~30 seconds
+
+=== Play the Game
+
+Open http://localhost:3000 in your browser and start playing!
+
+=== View Events
+
+Watch events flowing through Korvet in real-time:
+
+[source,bash]
+----
+docker compose logs -f consumer
+----
+
+You'll see:
+
+[source,text]
+----
+🎮 USER_GAME: {"user":"player123","game":{"score":100,"lives":3,"level":1}}
+💀 USER_LOSSES: {"user":"player123"}
+🎮 USER_GAME: {"user":"player456","game":{"score":250,"lives":2,"level":2}}
+----
+
+=== Useful Commands
+
+[source,bash]
+----
+docker compose ps              # Check service status
+docker compose logs -f web     # View web server logs
+docker compose logs -f korvet  # View Korvet logs
+docker compose down            # Stop all services
+----
+
+== How It Works
+
+=== Event Flow
+
+1. **Game produces events** when you:
+   * Score points → `USER_GAME` event
+   * Lose a life → `USER_GAME` event
+   * Game over → `USER_LOSSES` event
+
+2. **API server** receives HTTP POST and produces to Korvet using standard Kafka client (kafkajs)
+
+3. **Korvet** stores events in Redis Streams (masquerading as Kafka)
+
+4. **Consumer** reads events from Korvet in real-time using standard Kafka consumer
+
+=== Topics
+
+* `USER_GAME` - Game state updates (score, lives, level)
+* `USER_LOSSES` - Player loss events
+
+=== Behind the Scenes
+
+**Client Connection:**
+
+* kafkajs connects to `localhost:9092`
+* Korvet accepts connection using Kafka wire protocol
+* Client thinks it's talking to Kafka
+
+**Produce Request:**
+
+* Client sends Kafka ProduceRequest
+* Korvet parses the request
+* Korvet writes to Redis Stream: `XADD default:USER_GAME:0 * value <json>`
+* Korvet sends ProduceResponse back to client
+
+**Consume Request:**
+
+* Client sends Kafka FetchRequest
+* Korvet reads from Redis Stream: `XREAD STREAMS default:USER_GAME:0 <offset>`
+* Korvet formats response as Kafka FetchResponse
+* Client receives messages in standard Kafka format
+
+**Storage in Redis:**
+
+[source,text]
+----
+Key: default:USER_GAME:0
+Type: Stream
+Entries: [
+  {id: "1234567890-0", fields: {value: "{\"user\":\"player123\",...}"}},
+  {id: "1234567891-0", fields: {value: "{\"user\":\"player456\",...}"}},
+  ...
+]
+----
+
+== Verification and Testing
+
+=== Check Service Status
+
+[source,bash]
+----
+docker compose ps
+----
+
+Both `pacman-korvet` and `pacman-redis` should show "Up"
+
+=== Check Korvet Logs
+
+[source,bash]
+----
+docker compose logs korvet | grep "Started"
+----
+
+Should see: `Started KorvetApplication`
+
+=== Test API Health
+
+[source,bash]
+----
+curl http://localhost:3000/api/health
+----
+
+Should return:
+
+[source,json]
+----
+{"status":"ok","korvet":"connected","timestamp":"..."}
+----
+
+=== Test Event Production
+
+[source,bash]
+----
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "USER_GAME",
+    "event": {
+      "user": "test-player",
+      "game": {
+        "score": 100,
+        "lives": 3,
+        "level": 1
+      }
+    }
+  }'
+----
+
+Should return:
+
+[source,json]
+----
+{"success":true,"topic":"USER_GAME","message":"Event produced successfully"}
+----
+
+=== Verify Data in Redis
+
+[source,bash]
+----
+# Connect to Redis
+docker compose exec redis redis-cli
+
+# Inside Redis CLI:
+KEYS "default:*"                      # List all topics
+XLEN "default:USER_GAME:0"            # Count messages in USER_GAME
+XRANGE "default:USER_GAME:0" - + COUNT 10  # Read last 10 messages
+----
+
+== Project Structure
+
+[source,text]
+----
+samples/pacman/
+├── docker-compose.yml       # All services (Redis, Korvet, web, consumer)
+├── package.json             # Node.js dependencies
+├── server.js                # API server (replaces Lambda)
+├── consumer.js              # Event consumer
+├── public/                  # Pac-Man game files
+│   ├── index.html
+│   ├── game/
+│   │   ├── js/
+│   │   │   ├── game.js      # Modified to call local API
+│   │   │   ├── shared.js    # Modified API endpoint
+│   │   │   └── ...
+│   │   ├── css/
+│   │   └── img/
+│   └── ...
+└── README.adoc              # This file
+----
+
+== Comparison with Original Demo
+
+[cols="1,1", options="header"]
+|===
+|Original
+|Korvet Demo
+
+|AWS Lambda
+|Node.js Express server
+
+|AWS API Gateway
+|Express REST API
+
+|Confluent Cloud Kafka
+|Korvet (local)
+
+|ksqlDB
+|Simple consumer (no aggregations)
+
+|AWS S3 hosting
+|Local web server
+
+|Terraform deployment
+|Docker Compose
+|===
+
+== Troubleshooting
+
+=== Services Not Starting
+
+**Solution:**
+
+Check service status:
+
+[source,bash]
+----
+docker compose ps
+----
+
+View logs for any failing service:
+
+[source,bash]
+----
+docker compose logs redis
+docker compose logs korvet
+docker compose logs web
+docker compose logs consumer
+----
+
+=== Connection Refused to Korvet
+
+**Error:**
+
+[source,text]
+----
+❌ Failed to connect to Korvet: Connection refused
+----
+
+**Solution:**
+
+1. Make sure Korvet is running:
++
+[source,bash]
+----
+docker compose ps
+----
+
+2. Wait 10-15 seconds for Korvet to fully start
+
+3. Check Korvet logs:
++
+[source,bash]
+----
+docker compose logs korvet
+----
+
+4. Look for this line in the logs:
++
+[source,text]
+----
+Started KorvetApplication
+----
+
+=== Port Already in Use
+
+**Error:**
+
+[source,text]
+----
+Error starting userland proxy: listen tcp4 0.0.0.0:9092: bind: address already in use
+----
+
+**Solution:**
+
+1. Check what's using the port:
++
+[source,bash]
+----
+lsof -i :9092
+----
+
+2. Stop the conflicting service or change the port in `docker-compose.yml`
+
+=== Redis Connection Failed
+
+**Error:**
+
+[source,text]
+----
+Unable to connect to Redis
+----
+
+**Solution:**
+
+1. Check Redis is running:
++
+[source,bash]
+----
+docker compose ps redis
+----
+
+2. Test Redis connection:
++
+[source,bash]
+----
+docker compose exec redis redis-cli ping
+----
++
+Should return: `PONG`
+
+=== No Events Appearing in Consumer
+
+**Symptoms:**
+
+* Consumer is running but no events appear
+* Game is playing but no logs in consumer terminal
+
+**Solution:**
+
+1. Check API server is running and connected:
++
+[source,bash]
+----
+curl http://localhost:3000/api/health
+----
++
+Should return: `{"status":"ok","korvet":"connected",...}`
+
+2. Check browser console for errors (F12 in browser)
+
+3. Verify events are in Redis:
++
+[source,bash]
+----
+docker compose exec redis redis-cli
+KEYS "default:*"
+XLEN "default:USER_GAME:0"
+----
+
+4. Check consumer is subscribed to correct topics:
+   * Should see: `📡 Subscribed to topic: USER_GAME`
+   * Should see: `📡 Subscribed to topic: USER_LOSSES`
+
+=== Game Not Loading
+
+**Symptoms:**
+
+* Blank page at http://localhost:3000
+* 404 errors in browser console
+
+**Solution:**
+
+1. Make sure web service is running:
++
+[source,bash]
+----
+docker compose ps web
+----
+
+2. Check the web server logs:
++
+[source,bash]
+----
+docker compose logs web
+----
+
+3. Verify game files exist:
++
+[source,bash]
+----
+ls -la public/game/
+----
+
+=== Arrow Keys Scrolling Page
+
+**Problem:** Pressing arrow keys to move Pac-Man also scrolls the entire page.
+
+**Solution:** This should be fixed in the current version. If it persists:
+
+1. Hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+2. Clear browser cache
+3. Check browser console for JavaScript errors
+
+=== Clean Restart
+
+If all else fails, do a clean restart:
+
+[source,bash]
+----
+# Stop everything and remove volumes
+docker compose down -v
+
+# Rebuild and start fresh
+docker compose up -d --build
+----
+
+=== Debugging Commands
+
+[source,bash]
+----
+# Check all services status
+docker compose ps
+
+# View all logs
+docker compose logs
+
+# View Korvet logs only
+docker compose logs -f korvet
+
+# View Redis logs
+docker compose logs -f redis
+
+# Connect to Redis CLI
+docker compose exec redis redis-cli
+
+# List all topics
+docker compose exec redis redis-cli KEYS "default:*"
+
+# Count messages in a topic
+docker compose exec redis redis-cli XLEN "default:USER_GAME:0"
+
+# Read messages from a topic
+docker compose exec redis redis-cli XRANGE "default:USER_GAME:0" - + COUNT 10
+
+# Test API health
+curl http://localhost:3000/api/health
+
+# Test event production
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"USER_GAME","event":{"user":"test","game":{"score":100,"lives":3,"level":1}}}'
+----
+
+=== Verification Checklist
+
+* [ ] Services running: `docker compose ps` (all should be "Up")
+* [ ] Redis responding: `docker compose exec redis redis-cli ping`
+* [ ] Korvet started: `docker compose logs korvet | grep "Started KorvetApplication"`
+* [ ] Web server running: `curl http://localhost:3000/api/health`
+* [ ] Consumer connected: `docker compose logs consumer | grep "Connected to Korvet"`
+* [ ] Game loads: Open http://localhost:3000 in browser
+
+== Stopping the Demo
+
+[source,bash]
+----
+# Stop services
+docker compose down
+
+# Stop and remove all data
+docker compose down -v
+----
+
+== Why This Works
+
+Korvet implements the **Kafka wire protocol**, so any Kafka client works without modification:
+
+* ✅ Standard Kafka producer/consumer APIs
+* ✅ kafkajs (Node.js)
+* ✅ kafka-python
+* ✅ Java Kafka clients
+* ✅ Filebeat, Logstash, Spark Streaming
+
+Just point your client to `localhost:9092` instead of a Kafka broker!
+
+== What is Korvet?
+
+**Korvet** is a Kafka-compatible streaming service that:
+
+* Implements the Kafka wire protocol
+* Uses Redis Streams as the backend storage (instead of Kafka's log segments)
+* Works with standard Kafka clients without code changes
+* Provides automatic hot/cold data tiering (Redis → Delta Lake on S3)
+
+**Key Insight:** Any application using Kafka clients can point to Korvet instead, and it "just works" because Korvet masquerades as a Kafka broker.
+
+== Performance Characteristics
+
+=== Original Demo
+
+* Latency: ~50-200ms (cloud round-trip)
+* Throughput: Limited by Confluent Cloud tier
+* Cost: Pay per GB ingested/stored
+
+=== Korvet Demo
+
+* Latency: <10ms (local)
+* Throughput: 100K+ msg/sec (Redis Streams)
+* Cost: Free (local development)
+
+== Extending This Demo
+
+=== Add Scoreboard (Simple)
+
+Create a consumer that maintains in-memory state:
+
+[source,javascript]
+----
+const scores = {};
+consumer.on('message', (msg) => {
+  const event = JSON.parse(msg.value);
+  scores[event.user] = Math.max(scores[event.user] || 0, event.game.score);
+});
+----
+
+=== Add Scoreboard (Advanced)
+
+Use Kafka Streams or ksqlDB pointing to Korvet:
+
+[source,sql]
+----
+CREATE TABLE STATS_PER_USER AS
+  SELECT USER, MAX(GAME->SCORE) AS HIGHEST_SCORE
+  FROM USER_GAME
+  GROUP BY USER;
+----
+
+=== Add Multiple Players
+
+* Each player gets unique `window.name`
+* Events keyed by player ID
+* Consumer groups for parallel processing
+
+=== Add Persistence
+
+* Configure Redis persistence (RDB/AOF)
+* Or enable Korvet's cold storage tiering to S3
+
+== Next Steps
+
+1. **Try Multiple Players:** Open multiple browser tabs
+2. **Inspect Redis:** Use `redis-cli` to see raw data
+3. **Check Korvet Logs:** `docker compose logs -f korvet`
+4. **Modify Events:** Edit `server.js` to add custom fields
+5. **Add Aggregations:** Create a consumer that calculates high scores
+6. **Try Other Kafka Clients:**
+   * Replace kafkajs with kafka-python
+   * Use Java Kafka clients
+   * Try Filebeat or Logstash
+7. **Add Stream Processing:**
+   * Point ksqlDB to Korvet
+   * Use Kafka Streams with Korvet
+   * Implement custom aggregations
+8. **Explore Korvet Features:**
+   * Enable cold storage tiering
+   * Configure multi-tenancy
+   * Set up monitoring
+9. **Compare Performance:**
+   * Benchmark Korvet vs. Kafka
+   * Test with high message rates
+   * Measure latency distributions
+
+== Limitations of This Demo
+
+1. **No Stream Processing:** Original used ksqlDB for aggregations
+2. **No Scoreboard:** Just logs events to terminal
+3. **Single Partition:** Each topic has 1 partition
+4. **No Replication:** Single Korvet instance
+5. **No Schema Registry:** Using plain JSON
+6. **No Authentication:** Open access
+
+These are demo simplifications, not Korvet limitations.
+
+== References
+
+* Korvet Project: https://github.com/redis-field-engineering/korvet
+* Korvet Documentation: See `../../README.adoc`
+* Original streaming-pacman Demo: https://github.com/confluentinc/demo-scene/tree/master/streaming-pacman
+

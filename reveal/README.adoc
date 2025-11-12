@@ -1,0 +1,251 @@
+= Korvet Reveal.js Presentation
+:icons: font
+
+This directory contains a Reveal.js presentation about Korvet in AsciiDoc format.
+
+== Prerequisites
+
+=== Option 1: Docker (Recommended - No Local Installation)
+
+You only need Docker installed. No Ruby or gems required.
+
+[source,bash]
+----
+# Verify Docker is installed
+docker --version
+----
+
+=== Option 2: Local Installation
+
+Install Asciidoctor and the Asciidoctor Reveal.js backend:
+
+[source,bash]
+----
+# Install Ruby (if not already installed)
+# macOS: brew install ruby
+# Ubuntu/Debian: sudo apt-get install ruby-full
+
+# Install Asciidoctor and Asciidoctor Reveal.js
+gem install asciidoctor
+gem install asciidoctor-revealjs
+----
+
+== Building the Presentation
+
+=== Using Make (Recommended)
+
+The easiest way to build and view the presentation:
+
+[source,bash]
+----
+cd docs/reveal
+
+# Build the presentation
+make build
+
+# Build and serve on http://localhost:8000
+make serve
+
+# Build and open in browser
+make open
+
+# See all available commands
+make help
+----
+
+=== Manual Build
+
+From the repository root, run:
+
+[source,bash]
+----
+# Build the presentation
+asciidoctor-revealjs docs/reveal/presentation.adoc -o docs/reveal/index.html
+
+# Or from the docs/reveal directory
+cd docs/reveal
+asciidoctor-revealjs presentation.adoc -o index.html
+----
+
+This will generate `index.html` from the `presentation.adoc` source file.
+
+== Viewing the Presentation
+
+=== Option 1: Build and Open
+
+[source,bash]
+----
+# Build the presentation
+asciidoctor-revealjs docs/reveal/presentation.adoc -o docs/reveal/index.html
+
+# Open in browser (macOS)
+open docs/reveal/index.html
+
+# Linux
+xdg-open docs/reveal/index.html
+
+# Windows
+start docs/reveal/index.html
+----
+
+=== Option 2: Build and Serve Locally
+
+For the best experience, serve the presentation through a local web server:
+
+[source,bash]
+----
+# Build first
+asciidoctor-revealjs docs/reveal/presentation.adoc -o docs/reveal/index.html
+
+# Then serve using Python 3
+cd docs/reveal
+python3 -m http.server 8000
+
+# Or using Node.js
+npx http-server -p 8000
+
+# Or using Ruby
+ruby -run -ehttpd . -p8000
+----
+
+Then open http://localhost:8000 in your browser.
+
+== Navigation
+
+* *Next slide*: Space, →, ↓, Page Down
+* *Previous slide*: ←, ↑, Page Up
+* *Overview mode*: ESC or O
+* *Speaker notes*: S
+* *Fullscreen*: F
+* *Zoom*: Alt+Click (Windows/Linux) or Ctrl+Click (macOS)
+
+== Presentation Structure
+
+The presentation covers:
+
+. *Introduction*: What is Korvet and why it exists
+. *Problem Statement*: Challenges with Kafka at scale
+. *Solution*: Hot/cold tiering architecture
+. *Key Features*: Kafka compatibility, transparent tiering, multi-tenancy
+. *Architecture*: System overview and data flow
+. *Core Components*: Detailed component breakdown
+. *Tiering Service*: Apache Flink-based tiering
+. *Technology Stack*: Technologies used
+. *Performance Targets*: MVP performance goals
+. *Use Cases*: Real-world applications
+. *Multi-Tenancy*: Tenant isolation and quotas
+. *Roadmap*: Development milestones
+. *Quick Start*: Getting started guide
+. *Comparison*: Why choose Korvet
+
+== Customization
+
+=== Changing the Theme
+
+Edit `presentation.adoc` and change the theme in the document header:
+
+[source,asciidoc]
+----
+:revealjs_theme: black
+----
+
+Available themes: `black`, `white`, `league`, `beige`, `sky`, `night`, `serif`, `simple`, `solarized`
+
+=== Adding Speaker Notes
+
+Add speaker notes to any slide using the `[.notes]` block:
+
+[source,asciidoc]
+----
+== Slide Title
+
+Slide content here
+
+[.notes]
+--
+These are speaker notes. Press 'S' to view them.
+--
+----
+
+=== Modifying Content
+
+Edit `presentation.adoc` directly. Each `==` heading creates a new slide.
+
+[source,asciidoc]
+----
+== Slide Title
+
+Content here
+
+[%step]
+* Bullet point 1
+* Bullet point 2
+
+[.fragment]
+This text appears on click
+----
+
+=== AsciiDoc Reveal.js Features
+
+* `[%step]` - Incremental display of list items
+* `[.fragment]` - Fragment that appears on click
+* `[.columns]` - Two-column layout
+* `[.notes]` - Speaker notes
+* `[source,language]` - Code blocks with syntax highlighting
+
+== Exporting to PDF
+
+. Build the presentation first
++
+[source,bash]
+----
+asciidoctor-revealjs presentation.adoc -o index.html
+----
+
+. Open the presentation in Chrome or Chromium
+. Add `?print-pdf` to the URL (e.g., `http://localhost:8000?print-pdf`)
+. Open the print dialog (Ctrl+P or Cmd+P)
+. Set destination to "Save as PDF"
+. Set margins to "None"
+. Enable "Background graphics"
+. Save the PDF
+
+== Quick Reference
+
+=== Build Command
+
+[source,bash]
+----
+asciidoctor-revealjs presentation.adoc -o index.html
+----
+
+=== Build with Custom Options
+
+[source,bash]
+----
+asciidoctor-revealjs \
+  -a revealjsdir=https://cdn.jsdelivr.net/npm/reveal.js@4.6.0 \
+  -a revealjs_theme=night \
+  -a revealjs_slideNumber=true \
+  presentation.adoc -o index.html
+----
+
+=== Watch for Changes (requires entr)
+
+[source,bash]
+----
+# Install entr first: brew install entr (macOS) or apt-get install entr (Linux)
+echo presentation.adoc | entr asciidoctor-revealjs presentation.adoc -o index.html
+----
+
+== Resources
+
+* *Asciidoctor Reveal.js*: https://docs.asciidoctor.org/reveal.js-converter/latest/
+* *Reveal.js Documentation*: https://revealjs.com/
+* *Asciidoctor Documentation*: https://docs.asciidoctor.org/
+* *Korvet Repository*: https://github.com/redis-field-engineering/korvet
+
+== License
+
+This presentation is part of the Korvet project.
+

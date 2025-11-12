@@ -1,0 +1,168 @@
+:icons: font
+
+= Korvet
+
+A nimble, high-performance Kafka-compatible streaming service backed by Redis Streams.
+
+== What is Korvet?
+
+Korvet is a Kafka-compatible streaming service that enables existing Kafka clients to work with Redis Streams. Like its namesake—a fast, agile corvette (attack boat)—Korvet is designed to be nimble and efficient.
+
+=== Key Features
+
+* *Kafka Protocol Compatible*: Works with existing Kafka clients (Filebeat, Logstash, Spark Streaming, kafka-console-producer/consumer)
+* *Redis Streams Storage*: Leverages Redis Streams for high-performance message storage
+* *Consumer Groups*: Full support for Kafka consumer groups with offset management
+* *Topic Management*: Create, delete, and configure topics via Kafka Admin API
+* *Multi-Tenant Ready*: Built-in tenant isolation with configurable stream key patterns
+
+== Architecture Overview
+
+[source,text]
+----
+┌─────────────┐     ┌─────────────┐     ┌──────────────┐
+│  Filebeat   │────▶│             │────▶│              │
+└─────────────┘     │             │     │    Redis     │
+                    │   Korvet    │     │   Streams    │
+┌─────────────┐     │   Server    │     │              │
+│  Logstash   │────▶│             │◀────│  (Storage)   │
+└─────────────┘     │  (Kafka     │     │              │
+                    │   Protocol) │     └──────────────┘
+┌─────────────┐     │             │
+│   Spark     │◀────│             │
+│  Streaming  │     └─────────────┘
+└─────────────┘
+----
+
+=== Data Flow
+
+. *Produce*: Kafka clients send messages via Kafka protocol → Korvet → Redis Streams
+. *Consume*: Kafka clients fetch messages via Kafka protocol → Korvet → Redis Streams
+. *Consumer Groups*: Offset management and group coordination handled by Korvet
+
+== Quick Start
+
+=== Try the Samples (Recommended)
+
+The fastest way to try Korvet is with the ready-to-run samples:
+
+[source,bash]
+----
+# 2-minute demo with Kafka CLI tools
+cd samples/kafka-cli
+make up
+make producer  # Terminal 1
+make consumer  # Terminal 2
+----
+
+See link:samples/README.adoc[all samples] for more examples.
+
+=== Local Development
+
+*Prerequisites:* JDK 17+, Redis, Gradle 8.5+ (or use included wrapper)
+
+[source,bash]
+----
+# Build the project
+./gradlew clean build
+
+# Start Redis
+docker compose up -d redis
+
+# Run Korvet server
+./gradlew bootRun
+----
+
+=== Configuration
+
+See the https://redis-field-engineering.github.io/korvet[documentation site] for complete configuration options.
+
+Basic configuration in `application.yml`:
+
+[source,yaml]
+----
+korvet:
+  server:
+    host: 0.0.0.0
+    port: 9092
+  redis:
+    host: localhost
+    port: 6379
+----
+
+== Samples & Examples
+
+Try out Korvet with ready-to-run samples:
+
+* link:samples/kafka-cli/README.adoc[*Kafka CLI Demo*] ⭐ **START HERE** - Quickest way to demo Korvet (2 minutes)
+* link:samples/filebeat/README.adoc[*Filebeat Sample*] - Log aggregation with Filebeat and Logstash
+* link:samples/spark-streaming/README.adoc[*Spark Streaming Demo*] - Real-time stream processing with Apache Spark
+* link:samples/pacman/README.adoc[*Pac-Man Game*] - Interactive multiplayer game using Kafka protocol
+
+See link:samples/README.adoc[all samples] for detailed documentation.
+
+== Use Cases
+
+* *Log Aggregation*: Stream logs from Filebeat/Logstash to Redis Streams via Kafka protocol
+* *Event Streaming*: Real-time event processing with Spark Streaming using Kafka consumer API
+* *IoT Data Pipelines*: High-velocity sensor data ingestion with Redis Streams performance
+* *Kafka Migration*: Gradual migration from Kafka to Redis Streams with protocol compatibility
+
+== Technology Stack
+
+[cols="1,3"]
+|===
+|Component |Technology
+
+|Protocol
+|Kafka wire protocol (Netty)
+
+|Storage
+|Redis Streams (Lettuce client)
+
+|Framework
+|Spring Boot
+
+|Language
+|Java 17
+
+|Build
+|Gradle
+
+|Deployment
+|Docker, Kubernetes
+|===
+
+== Performance
+
+Target performance metrics:
+
+[cols="2,1"]
+|===
+|Metric |Target
+
+|Throughput
+|100K+ messages/sec
+
+|Latency (p99)
+|< 10ms
+
+|Concurrent Connections
+|1000+ clients
+|===
+
+== Support
+
+* *Issues*: https://github.com/redis-field-engineering/korvet-dist/issues[GitHub Issues]
+* *Discussions*: https://github.com/redis-field-engineering/korvet-dist/discussions[GitHub Discussions]
+
+== Etymology
+
+*Korvet* comes from:
+
+* *KoR*: Kafka-on-Redis
+* *Corvette*: A fast, agile sports car (performance)
+* *Corvette* (French): A nimble attack boat (agility)
+
+Fast, nimble, and efficient—just like our streaming service.
+

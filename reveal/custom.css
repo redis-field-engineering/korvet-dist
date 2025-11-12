@@ -1,0 +1,13 @@
+.black-text {
+    color: #000 !important;
+}
+
+.black-text em {
+    color: #000 !important;
+}
+
+.right {
+    float: right;
+    margin-left: 1em;
+}
+

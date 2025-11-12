@@ -1,0 +1,279 @@
+= Kafka CLI Tools Demo
+:toc:
+:icons: font
+
+== Overview
+
+The **simplest and fastest** way to demo Korvet using standard Kafka command-line tools.
+
+*What it demonstrates:*
+
+* ✅ Kafka protocol compatibility - no code changes needed
+* ✅ Producer sending messages via `kafka-console-producer`
+* ✅ Consumer reading messages via `kafka-console-consumer`
+* ✅ Data stored in Redis Streams
+* ✅ Zero code required - just CLI commands
+
+*Demo time:* 2 minutes
+
+== Prerequisites
+
+* Docker and Docker Compose
+
+== Quick Start (2 Minutes)
+
+=== 1. Start Services
+
+[source,bash]
+----
+cd samples/kafka-cli
+make up
+----
+
+NOTE: `make up` automatically builds the Korvet image if needed (takes 2-3 minutes first time). Wait 10-15 seconds for services to initialize.
+
+=== 2. Interactive Demo
+
+*Terminal 1 - Start Consumer:*
+
+[source,bash]
+----
+make consumer
+----
+
+*Terminal 2 - Send Messages:*
+
+[source,bash]
+----
+make producer
+
+# Type JSON messages (press Enter after each):
+{"message": "Hello from Korvet!", "id": 1}
+{"message": "Kafka protocol works!", "id": 2}
+{"user": "alice", "action": "login"}
+----
+
+Watch messages appear instantly in Terminal 1! 🎉
+
+=== 3. Stop Services
+
+[source,bash]
+----
+make down
+----
+
+== Makefile Commands
+
+[source,bash]
+----
+make help       # Show all available commands
+make up         # Start services (builds image if needed)
+make down       # Stop services
+make producer   # Start interactive producer
+make consumer   # Start interactive consumer
+make topics     # List all topics
+make redis-cli  # Connect to Redis CLI
+make logs       # View all logs
+make clean      # Stop and remove all data
+----
+
+== Manual Commands
+
+If you prefer not to use the Makefile:
+
+=== Produce Messages
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic demo-topic \
+  --producer-property enable.idempotence=false
+
+# Type JSON messages (one per line):
+{"message": "Hello from Korvet!", "id": 1}
+{"message": "This is message 2", "id": 2}
+{"user": "alice", "action": "login"}
+----
+
+=== Consume Messages
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic demo-topic \
+  --from-beginning
+----
+
+=== Verify Data in Redis
+
+[source,bash]
+----
+# Connect to Redis
+docker compose exec redis redis-cli
+
+# Inside Redis CLI:
+KEYS "default:*"                    # List all topics
+XLEN "default:demo-topic:0"         # Count messages
+XRANGE "default:demo-topic:0" - + COUNT 10  # Read messages
+----
+
+== Advanced Examples
+
+=== Produce with Keys
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic keyed-topic \
+  --property "parse.key=true" \
+  --property "key.separator=:" \
+  --producer-property enable.idempotence=false
+
+# Type messages as key:value
+user1:{"action":"login"}
+user2:{"action":"logout"}
+user1:{"action":"purchase"}
+----
+
+=== Consume with Consumer Group
+
+[source,bash]
+----
+# Consumer 1
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic demo-topic \
+  --group my-consumer-group \
+  --from-beginning
+
+# In another terminal - Consumer 2 (same group)
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic demo-topic \
+  --group my-consumer-group \
+  --from-beginning
+----
+
+=== Produce JSON Messages
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server korvet:9092 \
+  --topic json-logs \
+  --producer-property enable.idempotence=false
+
+# Paste JSON messages:
+{"timestamp":"2024-10-24T10:00:00Z","level":"INFO","message":"Application started"}
+{"timestamp":"2024-10-24T10:00:01Z","level":"WARN","message":"High memory usage"}
+{"timestamp":"2024-10-24T10:00:02Z","level":"ERROR","message":"Database connection failed"}
+----
+
+=== List Topics
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server korvet:9092 \
+  --list
+----
+
+=== Describe Topic
+
+[source,bash]
+----
+docker compose exec kafka-tools /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server korvet:9092 \
+  --describe \
+  --topic demo-topic
+----
+
+== Message Format
+
+[IMPORTANT]
+====
+By default, Korvet expects *JSON messages*. You have two options:
+
+1. *Send valid JSON* (recommended):
++
+[source,json]
+----
+{"message": "Hello", "id": 1}
+{"user": "alice", "action": "login"}
+----
+
+2. *Configure RAW format* in `docker-compose.yml`:
++
+[source,yaml]
+----
+environment:
+  KORVET_MESSAGE_FORMAT_DEFAULT: RAW
+----
+====
+
+== Troubleshooting
+
+*Korvet image not found?*
+
+Docker will automatically pull `redisfield/korvet` on first run. If you see this error, try:
+
+[source,bash]
+----
+docker pull redisfield/korvet
+----
+
+*Connection refused?*
+
+Wait 10-15 seconds for Korvet to start, then check logs:
+
+[source,bash]
+----
+docker compose logs korvet | grep "Started KorvetApplication"
+----
+
+*No messages appearing?*
+
+[source,bash]
+----
+docker compose ps              # Check all services are "Up"
+docker compose logs korvet     # Check for errors
+----
+
+*JSON parsing errors?*
+
+Make sure you're sending valid JSON:
+
+[source,json]
+----
+{"message": "Hello"}  ✅ Valid
+Hello                 ❌ Invalid (unless RAW format configured)
+----
+
+== What's Running
+
+* *Redis* (port 6379) - Storage backend
+* *Korvet* (port 9092) - Kafka-compatible server
+* *kafka-tools* - Container with Kafka CLI tools
+
+== Why This Works
+
+Korvet implements the Kafka wire protocol, so *any Kafka client works* without code changes:
+
+* ✅ kafka-console-producer / kafka-console-consumer
+* ✅ Filebeat, Logstash, Fluentd
+* ✅ Spark Streaming, Flink
+* ✅ Java/Python/Go/Node.js Kafka clients
+* ✅ Kafka Connect
+
+Just point your client to `korvet:9092` instead of Kafka!
+
+== Next Steps
+
+* Try the link:../filebeat/README.adoc[Filebeat sample] for real-world log aggregation
+* Try the link:../spark-streaming/README.adoc[Spark Streaming sample] for stream processing
+* Try the link:../pacman/README.adoc[Pac-Man game sample] for an interactive demo
+* Read the link:../../README.adoc[project documentation]
+

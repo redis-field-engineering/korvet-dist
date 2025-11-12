@@ -1,0 +1,100 @@
+= Korvet
+:revealjsdir: https://cdn.jsdelivr.net/npm/reveal.js@4.6.0
+:revealjs_theme: black
+:revealjs_slideNumber: true
+:revealjs_history: true
+:revealjs_controls: true
+:revealjs_progress: true
+:revealjs_transition: slide
+:revealjs_center: true
+:revealjs_customcss: custom.css
+:source-highlighter: highlight.js
+:icons: font
+
+[.notes]
+--
+Korvet - Internal Field Engineering presentation
+--
+
+== Korvet
+
+_A Kafka-compatible streaming service for Redis_
+
+[.small]
+Redis Field Engineering
+
+== What is Kafka?
+
+*Distributed streaming platform*
+
+[%step]
+* Pub/sub messaging
+* Topics, Partitions, Producers, Consumers
+* Ecosystem: Filebeat, Logstash, Spark
+
+== The Customer Problem
+
+_"We love Redis but our pipeline speaks Kafka..."_
+
+[%step]
+* Integrations: Filebeat, Logstash, Databricks
+* Need *cold storage* for historical data (can't keep everything in memory)
+
+[background-color="white"]
+== Introducing Korvet
+
+image::https://cdn.freebiesupply.com/logos/thumbs/1x/kafka-logo.png[Kafka Logo,400]
+
+[.black-text]
+_Ceci n'est pas un Kafka_
+
+[.notes]
+--
+This is a reference to René Magritte's famous painting "The Treachery of Images"
+Just like the painting of a pipe is not actually a pipe, Korvet is not actually Kafka -
+it just speaks the Kafka protocol!
+--
+
+== Korvet
+
+image::../../korvet.svg[Korvet Logo,100]
+
+*Kafka-on-Redis* (KoR)
+
+[%step]
+* Speaks *Kafka wire protocol* → drop-in replacement
+* *Redis Streams* for hot, *S3* for cold
+* *Best of both worlds:* Redis performance + S3 economics
+
+== Architecture
+
+[source,text]
+----
+┌──────────┐      ┌──────────┐
+│ Filebeat │─────▶│          │
+└──────────┘      │          │      ┌─────────────┐
+                  │  Korvet  │─────▶│Redis Streams│ (Hot)
+┌──────────┐      │  Server  │      └─────────────┘
+│ Logstash │─────▶│          │            │
+└──────────┘      │ (Kafka   │            │ Tiering
+                  │Protocol) │            ▼
+┌──────────┐      │          │      ┌────────────┐
+│Databricks│◀─────│          │      │   Iceberg  │ (Cold)
+│  Spark   │      └──────────┘      │    on S3   │
+└──────────┘                        └────────────┘
+----
+
+=== Data Flow
+
+[%step]
+* *Produce:* Filebeat/Logstash → Kafka protocol → Redis Streams
+* *Tier:* Background job moves old data → Delta Lake
+* *Consume:* Spark/Databricks → Kafka protocol → Hot or Cold (transparent)
+
+== Demo
+
+== Questions?
+
+https://github.com/redis-field-engineering/korvet[github.com/redis-field-engineering/korvet]
+
+

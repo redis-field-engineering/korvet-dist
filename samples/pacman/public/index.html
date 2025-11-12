@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Streaming Pac-Man</title>
+    <link rel="stylesheet" href="game/css/pacman.css">
+    <link rel="stylesheet" href="game/css/pacman-home.css">
+    <style>
+        /* Override default body styles to prevent page scrolling */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden; /* Prevent page scrolling */
+            position: fixed; /* Fix body position */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Prevent arrow key scrolling */
+        body, html {
+            overflow: hidden;
+        }
+
+        /* Container for the entire app */
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow-y: auto;
+            background: #000;
+            color: #fff;
+        }
+
+        .header {
+            text-align: center;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-left: 10px;
+            font-size: 0.9em;
+        }
+        .status.connected {
+            background: #10b981;
+            color: white;
+        }
+        .status.disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+
+
+        /* Game container - ensure it's visible and on top */
+        #game-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            position: relative;
+            z-index: 100;
+        }
+
+        /* Event log - fixed at bottom */
+        .event-log {
+            background: #1a1a1a;
+            border: 2px solid #764ba2;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1001;
+            flex-shrink: 0;
+            transition: bottom 0.3s ease;
+        }
+        .event-log.collapsed {
+            bottom: -150px; /* Hide the content when collapsed */
+        }
+        .event-log-header {
+            padding: 10px 15px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2a2a2a;
+            border-bottom: 1px solid #764ba2;
+        }
+        .event-log-header:hover {
+            background: #333;
+        }
+        .event-log-header h3 {
+            margin: 0;
+            color: #764ba2;
+            font-size: 1em;
+        }
+        .event-log-toggle {
+            color: #764ba2;
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+        .event-log.collapsed .event-log-toggle {
+            transform: rotate(180deg);
+        }
+        .event-log-content {
+            padding: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .event {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            padding: 5px;
+            margin: 5px 0;
+            background: #2a2a2a;
+            border-left: 3px solid #667eea;
+            border-radius: 3px;
+        }
+        .event.loss {
+            border-left-color: #ef4444;
+        }
+
+        /* Make sure game elements are properly positioned */
+        #home, #panel {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Add padding to bottom of game wrapper so event log doesn't cover game */
+        #game-wrapper {
+            padding-bottom: 170px; /* Height of event log + some margin */
+        }
+
+        /* Ensure game canvases are visible */
+        canvas {
+            display: block;
+        }
+
+        /* Help and sound buttons should be visible */
+        .help-button, .sound {
+            z-index: 20;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div class="header">
+            <h1>🎮 Streaming Pac-Man</h1>
+            <div>
+                Korvet Status: <span id="status" class="status disconnected">Checking...</span>
+            </div>
+        </div>
+
+        <div id="game-wrapper">
+
+    <div id="sound"></div>
+
+    <div id="help">
+        <h2>Help</h2>
+        <table align="center" border="0" cellPadding="2" cellSpacing="0">
+            <tbody>
+                <tr><td>Arrow Left : </td><td>Move Left</td></tr>
+                <tr><td>Arrow Right : </td><td>Move Right</td></tr>
+                <tr><td>Arrow Down : </td><td>Move Down</td></tr>
+                <tr><td>Arrow Up : </td><td>Move Up</td></tr>
+                <tr><td colspan="2">&nbsp;</td></tr>
+                <tr><td>P : </td><td>PAUSE</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="home">
+        <h1>Pac-Man</h1>
+        <h3>Streaming Pac-Man with Korvet</h3>
+        <canvas id="canvas-home-title-pacman"></canvas>
+        <div id="presentation">
+            <div id="presentation-titles">character &nbsp;/&nbsp; nickname</div>
+            <canvas id="canvas-presentation-blinky"></canvas><div id="presentation-character-blinky">- shadow</div><div id="presentation-name-blinky">"korvet"</div>
+            <canvas id="canvas-presentation-pinky"></canvas><div id="presentation-character-pinky">- speedy</div><div id="presentation-name-pinky">"redis"</div>
+            <canvas id="canvas-presentation-inky"></canvas><div id="presentation-character-inky">- bashful</div><div id="presentation-name-inky">"streams"</div>
+            <canvas id="canvas-presentation-clyde"></canvas><div id="presentation-character-clyde">- pokey</div><div id="presentation-name-clyde">"events"</div>
+        </div>
+        <canvas id="trailer"></canvas>
+        <div class="help-button">- help -</div>
+        <a class="sound" href="javascript:void(0);" data-sound="on"><img src="game/img/sound-on.png" alt="" border="0"></a>
+    </div>
+
+    <div id="panel">
+        <h1>Pac-Man</h1>
+        <canvas id="canvas-panel-title-pacman"></canvas>
+        <div id="score"><h2>Score</h2><span>00</span></div>
+        <div id="highscore"><h2>High Score</h2><span>00</span></div>
+        <div id="level"><h2>Level</h2><span>1UP</span></div>
+        <div id="board">
+            <canvas id="canvas-board"></canvas>
+            <canvas id="canvas-paths"></canvas>
+            <canvas id="canvas-bubbles"></canvas>
+            <canvas id="canvas-fruits"></canvas>
+            <canvas id="canvas-pacman"></canvas>
+            <canvas id="canvas-ghost-blinky"></canvas>
+            <canvas id="canvas-ghost-pinky"></canvas>
+            <canvas id="canvas-ghost-inky"></canvas>
+            <canvas id="canvas-ghost-clyde"></canvas>
+        </div>
+        <div id="control">
+            <div id="control-up"></div>
+            <div id="control-up-second"></div>
+            <div id="control-down"></div>
+            <div id="control-down-second"></div>
+            <div id="control-left"></div>
+            <div id="control-right"></div>
+        </div>
+        <canvas id="canvas-lifes"></canvas>
+        <canvas id="canvas-level-fruits"></canvas>
+        <div id="message"></div>
+        <div class="help-button">- help -</div>
+        <a class="sound" href="javascript:void(0);" data-sound="on"><img src="game/img/sound-on.png" alt="" border="0"></a>
+    </div>
+        </div><!-- end game-wrapper -->
+
+        <div class="event-log collapsed">
+            <div class="event-log-header" onclick="toggleEventLog()">
+                <h3>📊 Recent Events (Last 10)</h3>
+                <span class="event-log-toggle">▼</span>
+            </div>
+            <div class="event-log-content">
+                <div id="events"></div>
+            </div>
+        </div>
+    </div><!-- end app-container -->
+
+    <script>
+        // Prevent arrow keys from scrolling the page
+        window.addEventListener("keydown", function(e) {
+            // Arrow keys are 37-40
+            if([37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+                e.preventDefault();
+            }
+        }, false);
+
+        // Prevent spacebar from scrolling
+        window.addEventListener('keydown', function(e) {
+            if(e.keyCode == 32 && e.target == document.body) {
+                e.preventDefault();
+            }
+        });
+
+        // API endpoint configuration
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        // Check Korvet status
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                const statusEl = document.getElementById('status');
+
+                if (data.korvet === 'connected') {
+                    statusEl.textContent = 'Connected ✓';
+                    statusEl.className = 'status connected';
+                } else {
+                    statusEl.textContent = 'Disconnected ✗';
+                    statusEl.className = 'status disconnected';
+                }
+            } catch (error) {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = 'Error ✗';
+                statusEl.className = 'status disconnected';
+            }
+        }
+
+        // Check status on load and every 5 seconds
+        checkStatus();
+        setInterval(checkStatus, 5000);
+
+        // Toggle event log
+        function toggleEventLog() {
+            const eventLog = document.querySelector('.event-log');
+            eventLog.classList.toggle('collapsed');
+        }
+
+        // Event logging
+        const maxEvents = 10;
+        const eventLog = [];
+
+        function logEvent(topic, event) {
+            const timestamp = new Date().toLocaleTimeString();
+            const eventDiv = document.createElement('div');
+            eventDiv.className = topic === 'USER_LOSSES' ? 'event loss' : 'event';
+
+            let eventText = '';
+            if (topic === 'USER_GAME') {
+                eventText = `🎮 [${timestamp}] Score: ${event.game.score}, Lives: ${event.game.lives}, Level: ${event.game.level}`;
+            } else if (topic === 'USER_LOSSES') {
+                eventText = `💀 [${timestamp}] Game Over for ${event.user}`;
+            }
+
+            eventDiv.textContent = eventText;
+
+            const eventsContainer = document.getElementById('events');
+            eventsContainer.insertBefore(eventDiv, eventsContainer.firstChild);
+
+            // Keep only last 10 events
+            while (eventsContainer.children.length > maxEvents) {
+                eventsContainer.removeChild(eventsContainer.lastChild);
+            }
+        }
+
+        // Override the event sending function
+        window.sendEventToKorvet = async function(topic, event) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/events`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ topic, event }),
+                });
+
+                if (response.ok) {
+                    logEvent(topic, event);
+                } else {
+                    console.error('Failed to send event:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error sending event:', error);
+            }
+        };
+    </script>
+
+    <!-- Load game scripts in correct order -->
+    <script src="game/js/jquery.js"></script>
+    <script src="game/js/jquery-buzz.js"></script>
+    <script src="game/js/env-vars.js"></script>
+    <script src="game/js/shared.js"></script>
+    <script src="game/js/tools.js"></script>
+    <script src="game/js/board.js"></script>
+    <script src="game/js/paths.js"></script>
+    <script src="game/js/bubbles.js"></script>
+    <script src="game/js/fruits.js"></script>
+    <script src="game/js/pacman.js"></script>
+    <script src="game/js/ghosts.js"></script>
+    <script src="game/js/home.js"></script>
+    <script src="game/js/sound.js"></script>
+    <script src="game/js/game.js"></script>
+
+    <script>
+        // Initialize the game when page loads
+        $(document).ready(function() {
+            // Set a default player name if not set
+            if (!window.name || window.name.length === 0) {
+                window.name = 'player' + Math.floor(Math.random() * 10000);
+            }
+
+            // Load sounds
+            loadAllSound();
+
+            // Initialize home screen
+            HELP_TIMER = setInterval('blinkHelp()', HELP_DELAY);
+            initHome();
+
+            // Sound toggle
+            $(".sound").click(function(e) {
+                e.stopPropagation();
+                var sound = $(this).attr("data-sound");
+                if (sound === "on") {
+                    $(".sound").attr("data-sound", "off");
+                    $(".sound").find("img").attr("src", "game/img/sound-off.png");
+                    GROUP_SOUND.mute();
+                } else {
+                    $(".sound").attr("data-sound", "on");
+                    $(".sound").find("img").attr("src", "game/img/sound-on.png");
+                    GROUP_SOUND.unmute();
+                }
+            });
+
+            // Help button
+            $(".help-button, #help").click(function(e) {
+                e.stopPropagation();
+                if (!PACMAN_DEAD && !LOCK && !GAMEOVER) {
+                    if ($('#help').css("display") === "none") {
+                        $('#help').fadeIn("slow");
+                        $(".help-button").hide();
+                        if ($("#panel").css("display") !== "none") {
+                            pauseGame();
+                        }
+                    } else {
+                        $('#help').fadeOut("slow");
+                        $(".help-button").show();
+                    }
+                }
+            });
+
+            // Keyboard controls
+            function simulateKeyup(code) {
+                var e = jQuery.Event("keyup");
+                e.keyCode = code;
+                jQuery('body').trigger(e);
+            }
+
+            function simulateKeydown(code) {
+                var e = jQuery.Event("keydown");
+                e.keyCode = code;
+                jQuery('body').trigger(e);
+            }
+
+            $("#home").on("click touchstart", function(e) {
+                if ($('#help').css("display") === "none") {
+                    e.preventDefault();
+                    simulateKeydown(13);
+                }
+            });
+
+            $("body").keyup(function(e) {
+                KEYDOWN = false;
+            });
+
+            $("body").keydown(function(e) {
+                if (HOME) {
+                    initGame(true);
+                } else {
+                    KEYDOWN = true;
+                    if (PACMAN_DEAD && !LOCK) {
+                        erasePacman();
+                        resetPacman();
+                        drawPacman();
+                        eraseGhosts();
+                        resetGhosts();
+                        drawGhosts();
+                        moveGhosts();
+                        blinkSuperBubbles();
+                    } else if (e.keyCode >= 37 && e.keyCode <= 40 && !PAUSE && !PACMAN_DEAD && !LOCK) {
+                        if (e.keyCode === 39) {
+                            movePacman(1);
+                        } else if (e.keyCode === 40) {
+                            movePacman(2);
+                        } else if (e.keyCode === 37) {
+                            movePacman(3);
+                        } else if (e.keyCode === 38) {
+                            movePacman(4);
+                        }
+                    } else if (e.keyCode === 80 && !PACMAN_DEAD && !LOCK) {
+                        if (PAUSE) {
+                            resumeGame();
+                        } else {
+                            pauseGame();
+                        }
+                    } else if (GAMEOVER) {
+                        initHome();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
