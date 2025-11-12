@@ -105,11 +105,9 @@ All samples require:
 * Docker Compose 2.0+
 * At least 2GB available memory
 
-== Building Korvet
+All samples use the official `redisfield/korvet` Docker image from Docker Hub - no build step required!
 
-The samples use the official `redisfield/korvet` Docker image from Docker Hub. No build step required!
-
-=== Run the Sample
+== Run the Sample
 
 [source,bash]
 ----
