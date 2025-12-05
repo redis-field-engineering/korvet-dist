@@ -70,6 +70,37 @@ make up
 make demo
 ----
 
+
+=== link:grafana-demo/README.adoc[Grafana Metrics Demo]
+
+Complete observability stack with Prometheus and Grafana dashboards.
+
+**Includes:**
+
+* Redis backend storage
+* Korvet server with Kafka protocol
+* Prometheus metrics collection
+* Pre-built Grafana dashboard
+* Load generators (producer and consumer)
+
+**Use Cases:**
+
+* Monitoring and observability demos
+* Performance testing and benchmarking
+* Metrics visualization
+* Dashboard development
+
+**Demo time:** 3 minutes
+
+**Quick Start:**
+
+[source,bash]
+----
+cd grafana-demo
+make up
+make dashboard  # Opens Grafana in browser
+----
+
 === link:filebeat/README.adoc[Filebeat Sample]
 
 Demonstrates log shipping from Filebeat to Korvet using the Kafka protocol.
