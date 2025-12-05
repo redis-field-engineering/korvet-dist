@@ -77,7 +77,25 @@ Once the stack is running, you'll see:
 * **Produce Latency**: p50, p95, p99 latency metrics for produce operations
 * **Fetch Rate**: Messages fetched per second
 * **Fetch Latency**: p50, p95, p99 latency metrics for fetch operations
+* **Ingress Throughput**: Bytes per second being produced (ingress)
+* **Egress Throughput**: Bytes per second being fetched (egress)
 * **Error Rate**: Should be 0% under normal operation
+
+**Redis Command Metrics Section** (use the "Redis Command" dropdown to filter):
+
+* **Command Rate**: Operations per second for selected command(s)
+* **Latency Percentiles**: p50, p95, p99 latency for selected command(s)
+* **Average Latency**: Mean latency for selected command(s)
+
+**JVM & System Metrics Section**:
+
+* **Heap Used**: Heap memory usage as percentage (gauge with thresholds)
+* **Non-Heap Used**: Non-heap memory usage as percentage (gauge with thresholds)
+* **CPU Usage**: Process and system CPU utilization
+* **Load Average**: System load average (1 minute)
+* **GC Pause Duration**: Garbage collection pause time by action and cause
+* **GC Count**: Garbage collection frequency by action and cause
+* **Threads**: Live, daemon, and peak thread counts
 
 == Customizing the Load
 
