@@ -96,7 +96,7 @@ Try out Korvet with ready-to-run samples:
 * link:samples/kafka-cli/README.adoc[*Kafka CLI Demo*] ⭐ **START HERE** - Quickest way to demo Korvet (2 minutes)
 * link:samples/filebeat/README.adoc[*Filebeat Sample*] - Log aggregation with Filebeat and Logstash
 * link:samples/spark-streaming/README.adoc[*Spark Streaming Demo*] - Real-time stream processing with Apache Spark
-* link:samples/grafana-demo/README.adoc[*Grafana Metrics Demo*] - Observability with Prometheus and Grafana dashboards
+* link:samples/grafana/README.adoc[*Grafana Metrics Demo*] - Observability with Prometheus and Grafana dashboards
 * link:samples/pacman/README.adoc[*Pac-Man Game*] - Interactive multiplayer game using Kafka protocol
 
 See link:samples/README.adoc[all samples] for detailed documentation.
