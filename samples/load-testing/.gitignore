@@ -1,0 +1,10 @@
+# Docker volumes
+.docker/
+
+# Test results
+results/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

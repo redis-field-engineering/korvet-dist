@@ -1,0 +1,199 @@
+= Korvet Load Testing - Quick Start Guide
+:toc:
+
+== 5-Minute Quick Start
+
+=== 1. Start the Environment
+
+[source,bash]
+----
+cd /path/to/korvet-dist/samples/load-testing
+make up
+----
+
+Wait for all services to start (~30 seconds).
+
+=== 2. Run Your First Test
+
+[source,bash]
+----
+make test-basic
+----
+
+This will:
+
+* Produce 10,000 messages (1KB each)
+* Consume all messages
+* Show performance metrics
+
+**Expected output:**
+----
+10000 records sent, 995.024876 records/sec (0.97 MB/sec), 
+123.45 ms avg latency, 234.56 ms max latency
+----
+
+=== 3. View Metrics
+
+[source,bash]
+----
+make dashboard
+----
+
+Opens Grafana at http://localhost:3000 (login: admin/admin)
+
+=== 4. Run More Tests
+
+**Baseline test (100K messages):**
+[source,bash]
+----
+make test-baseline
+----
+
+**High throughput test (1M messages):**
+[source,bash]
+----
+make test-high-throughput
+----
+
+**Large messages (100KB each):**
+[source,bash]
+----
+make test-large-messages
+----
+
+=== 5. Clean Up
+
+[source,bash]
+----
+make down
+----
+
+== Available Commands
+
+Run `make` or `make help` to see all available commands:
+
+----
+Setup:
+  make up                    - Start all services
+  make down                  - Stop all services
+  make clean                 - Stop services and remove volumes
+
+Basic Tests:
+  make test-producer         - Run producer performance test
+  make test-consumer         - Run consumer performance test
+  make test-basic            - Run basic end-to-end test
+
+Test Scenarios:
+  make test-baseline         - Baseline performance (100K msgs, 1KB, 10K/sec)
+  make test-high-throughput  - High throughput test (1M msgs, unlimited)
+  make test-large-messages   - Large message test (10K msgs, 100KB)
+  make test-consumer-group   - Consumer group test (4 consumers)
+  make test-sustained        - Sustained load test (10 minutes)
+
+Monitoring:
+  make dashboard             - Open Grafana dashboard
+  make metrics               - Open Prometheus metrics
+  make redis-cli             - Connect to Redis CLI
+----
+
+== Understanding the Results
+
+=== Producer Performance
+
+Example output:
+----
+100000 records sent, 9950.248756 records/sec (9.72 MB/sec), 
+1234.56 ms avg latency, 2345.67 ms max latency, 
+1000 ms 50th, 2000 ms 95th, 2300 ms 99th, 2345 ms 99.9th.
+----
+
+**Key metrics:**
+
+* **records/sec**: Throughput in messages per second
+* **MB/sec**: Throughput in megabytes per second
+* **avg latency**: Average time to send a message
+* **max latency**: Maximum time to send a message
+* **50th/95th/99th**: Latency percentiles
+
+**Good performance:**
+
+* Throughput: >10,000 msg/sec for 1KB messages
+* p50 latency: <10ms
+* p95 latency: <50ms
+* p99 latency: <100ms
+
+=== Consumer Performance
+
+Example output:
+----
+start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, 
+nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+2024-12-16 22:00:00:000, 2024-12-16 22:00:10:000, 97.6563, 9.7656, 
+100000, 10000.0000, 1234, 8766, 11.1400, 11404.8000
+----
+
+**Key metrics:**
+
+* **nMsg.sec**: Consumer throughput (messages/sec)
+* **MB.sec**: Consumer throughput (MB/sec)
+* **fetch.time.ms**: Time spent fetching messages
+
+**Good performance:**
+
+* Consumer throughput: >15,000 msg/sec for 1KB messages
+* Should be higher than producer throughput
+
+== Troubleshooting
+
+=== Services won't start
+
+Check Docker:
+[source,bash]
+----
+docker compose ps
+docker compose logs
+----
+
+=== Low performance
+
+1. Check system resources:
+[source,bash]
+----
+docker stats
+----
+
+2. Check Redis performance:
+[source,bash]
+----
+make redis-cli
+# In Redis CLI:
+INFO stats
+----
+
+3. Increase resources in docker-compose.yml
+
+=== Connection errors
+
+Verify Korvet is running:
+[source,bash]
+----
+make status
+----
+
+Should show all services as "healthy".
+
+== Next Steps
+
+* Read the full link:README.adoc[README] for detailed documentation
+* Try different test scenarios
+* Experiment with configuration tuning
+* Compare with native Kafka performance
+* Integrate into your CI/CD pipeline
+
+== Support
+
+For issues or questions:
+
+* Check the link:README.adoc[full documentation]
+* Review link:../../README.adoc[Korvet project README]
+* Open an issue on GitHub

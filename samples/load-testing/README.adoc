@@ -1,0 +1,437 @@
+= Korvet Load Testing Sample
+:toc:
+:icons: font
+
+== Overview
+
+This sample demonstrates various approaches to load testing Korvet using industry-standard Kafka benchmarking tools.
+
+**Includes:**
+
+* Redis backend storage
+* Korvet server with Kafka protocol
+* Kafka's built-in performance testing tools
+* Grafana k6 with xk6-kafka extension
+* Sangrenel high-performance load generator
+* Pre-configured test scenarios
+* Prometheus + Grafana for metrics visualization
+
+**Use Cases:**
+
+* Performance benchmarking
+* Capacity planning
+* Stress testing
+* Regression testing
+* Comparing Korvet vs native Kafka performance
+
+**Demo time:** 10-15 minutes
+
+== Prerequisites
+
+* Docker 20.10+
+* Docker Compose 2.0+
+* At least 4GB available memory
+* (Optional) Go 1.21+ for building custom tools
+
+== Quick Start
+
+[source,bash]
+----
+cd load-testing
+make up          # Start Korvet, Redis, Prometheus, Grafana
+make test-basic  # Run basic performance test
+make dashboard   # Open Grafana dashboard
+----
+
+== Available Load Testing Tools
+
+=== 1. Kafka Built-in Performance Tools (Recommended Starting Point)
+
+The simplest approach using Kafka's standard benchmarking tools.
+
+**Run Producer Performance Test:**
+
+[source,bash]
+----
+make test-producer
+----
+
+This runs:
+[source,bash]
+----
+kafka-producer-perf-test.sh \
+  --topic perf-test \
+  --num-records 100000 \
+  --record-size 1024 \
+  --throughput 10000 \
+  --producer-props bootstrap.servers=korvet:9092
+----
+
+**Run Consumer Performance Test:**
+
+[source,bash]
+----
+make test-consumer
+----
+
+**Expected Output:**
+----
+100000 records sent, 9950.248756 records/sec (9.72 MB/sec), 
+1234.56 ms avg latency, 2345.67 ms max latency, 
+1000 ms 50th, 2000 ms 95th, 2300 ms 99th, 2345 ms 99.9th.
+----
+
+=== 2. Grafana k6 with Kafka Extension (Advanced Scenarios)
+
+Modern load testing with scriptable scenarios.
+
+**Run k6 Load Test:**
+
+[source,bash]
+----
+make test-k6
+----
+
+**Features:**
+
+* Custom JavaScript test scenarios
+* Multiple producers/consumers
+* Complex message patterns
+* Detailed metrics and reporting
+* CI/CD integration
+
+**Example Scenario:**
+[source,javascript]
+----
+import { produce } from 'k6/x/kafka';
+
+export default function () {
+  produce(['korvet:9092'], 'test-topic', [{
+    key: `key-${__VU}-${__ITER}`,
+    value: JSON.stringify({
+      timestamp: Date.now(),
+      vu: __VU,
+      iteration: __ITER,
+      data: 'x'.repeat(1024)
+    })
+  }]);
+}
+----
+
+=== 3. Sangrenel (High-Throughput Stress Testing)
+
+Lightweight Go-based tool for maximum throughput testing.
+
+**Run Sangrenel Test:**
+
+[source,bash]
+----
+make test-sangrenel
+----
+
+**Features:**
+
+* Very high throughput (millions of messages/sec)
+* Low resource overhead
+* Simple configuration
+* Real-time metrics
+
+== Test Scenarios
+
+=== Scenario 1: Baseline Performance
+
+Test basic throughput with standard message sizes.
+
+[source,bash]
+----
+make test-baseline
+----
+
+**Configuration:**
+* Messages: 100,000
+* Message size: 1KB
+* Target throughput: 10,000 msg/sec
+* Partitions: 1
+
+=== Scenario 2: High Throughput
+
+Test maximum sustainable throughput.
+
+[source,bash]
+----
+make test-high-throughput
+----
+
+**Configuration:**
+* Messages: 1,000,000
+* Message size: 1KB
+* Target throughput: unlimited
+* Partitions: 4
+
+=== Scenario 3: Large Messages
+
+Test with larger message payloads.
+
+[source,bash]
+----
+make test-large-messages
+----
+
+**Configuration:**
+* Messages: 10,000
+* Message size: 100KB
+* Target throughput: 1,000 msg/sec
+* Partitions: 1
+
+=== Scenario 4: Consumer Group Performance
+
+Test consumer group behavior with multiple consumers.
+
+[source,bash]
+----
+make test-consumer-group
+----
+
+**Configuration:**
+* Consumers: 4
+* Partitions: 4
+* Messages: 100,000
+* Consumer group: perf-test-group
+
+=== Scenario 5: Sustained Load
+
+Long-running test to check stability.
+
+[source,bash]
+----
+make test-sustained
+----
+
+**Configuration:**
+* Duration: 10 minutes
+* Target throughput: 5,000 msg/sec
+* Message size: 1KB
+
+== Monitoring and Metrics
+
+=== View Real-Time Metrics
+
+**Grafana Dashboard:**
+
+[source,bash]
+----
+make dashboard
+----
+
+Opens http://localhost:3000 with pre-configured dashboard showing:
+
+* Throughput (messages/sec, MB/sec)
+* Latency (p50, p95, p99, p999)
+* Error rates
+* Consumer lag
+* JVM metrics
+* Redis metrics
+
+**Prometheus Metrics:**
+
+[source,bash]
+----
+make metrics
+----
+
+Opens http://localhost:9090 for raw metrics exploration.
+
+=== Key Metrics to Monitor
+
+**Producer Metrics:**
+* `korvet_producer_records_total` - Total records produced
+* `korvet_producer_bytes_total` - Total bytes produced
+* `korvet_producer_latency_seconds` - Producer latency
+
+**Consumer Metrics:**
+* `korvet_consumer_records_total` - Total records consumed
+* `korvet_consumer_lag` - Consumer lag
+* `korvet_consumer_latency_seconds` - Consumer latency
+
+**System Metrics:**
+* `process_cpu_usage` - CPU usage
+* `jvm_memory_used_bytes` - Memory usage
+* `redis_connected_clients` - Redis connections
+
+== Interpreting Results
+
+=== Throughput
+
+**Good Performance:**
+* Producer: >10,000 msg/sec for 1KB messages
+* Consumer: >15,000 msg/sec for 1KB messages
+
+**Factors Affecting Throughput:**
+* Message size (larger = lower msg/sec, but higher MB/sec)
+* Number of partitions (more = higher throughput)
+* Batch size (larger = higher throughput)
+* Compression (enabled = lower throughput, less storage)
+
+=== Latency
+
+**Good Performance:**
+* p50: <10ms
+* p95: <50ms
+* p99: <100ms
+* p999: <500ms
+
+**Factors Affecting Latency:**
+* Network latency to Redis
+* Redis performance
+* Message size
+* System load
+
+=== Resource Usage
+
+**Typical Resource Usage:**
+* CPU: 1-2 cores at 10,000 msg/sec
+* Memory: 512MB-1GB heap
+* Redis memory: ~1KB per message (depends on retention)
+
+== Comparing with Native Kafka
+
+To compare Korvet performance with native Kafka:
+
+[source,bash]
+----
+# Start native Kafka
+make kafka-up
+
+# Run same tests against Kafka
+make test-kafka-baseline
+
+# Compare results
+make compare-results
+----
+
+== Advanced Configuration
+
+=== Tuning Korvet for Performance
+
+Edit `docker-compose.yml` to adjust Korvet settings:
+
+[source,yaml]
+----
+korvet:
+  environment:
+    # Increase worker threads
+    KORVET_SERVER_WORKER_THREADS: 8
+    
+    # Increase max request size
+    KORVET_SERVER_MAX_REQUEST_SIZE: 10MB
+    
+    # Increase Redis pool size
+    KORVET_REDIS_POOL_SIZE: 16
+    
+    # JVM tuning
+    JAVA_OPTS: >-
+      -Xms1g -Xmx2g
+      -XX:+UseG1GC
+      -XX:MaxGCPauseMillis=20
+----
+
+=== Tuning Redis for Performance
+
+[source,yaml]
+----
+redis:
+  command: >
+    redis-server
+    --maxmemory 2gb
+    --maxmemory-policy allkeys-lru
+    --save ""
+    --appendonly no
+----
+
+== Troubleshooting
+
+=== Low Throughput
+
+**Check:**
+1. Redis performance: `docker compose exec redis redis-cli INFO stats`
+2. Network latency: `docker compose exec kafka-tools ping redis`
+3. CPU usage: `docker stats`
+4. Korvet logs: `docker compose logs korvet`
+
+**Solutions:**
+* Increase worker threads
+* Increase Redis pool size
+* Use multiple partitions
+* Increase batch size
+
+=== High Latency
+
+**Check:**
+1. Redis latency: `docker compose exec redis redis-cli --latency`
+2. Network issues: `docker compose exec kafka-tools ping korvet`
+3. GC pauses: Check Korvet logs for GC events
+
+**Solutions:**
+* Tune JVM GC settings
+* Reduce message size
+* Optimize Redis configuration
+* Check system resources
+
+=== Out of Memory
+
+**Solutions:**
+* Increase JVM heap: `-Xmx2g`
+* Configure Redis maxmemory
+* Reduce message retention
+* Use compression
+
+== Cleanup
+
+[source,bash]
+----
+# Stop all services
+make down
+
+# Remove all data
+make clean
+----
+
+== Example Results
+
+Here are typical results from a MacBook Pro (M1, 16GB RAM):
+
+**Baseline Test (1KB messages):**
+----
+Throughput: 12,500 msg/sec (12.2 MB/sec)
+Latency p50: 8ms, p95: 25ms, p99: 45ms
+CPU: 1.5 cores, Memory: 800MB
+----
+
+**High Throughput Test (unlimited):**
+----
+Throughput: 45,000 msg/sec (43.9 MB/sec)
+Latency p50: 15ms, p95: 85ms, p99: 150ms
+CPU: 3.2 cores, Memory: 1.2GB
+----
+
+**Large Messages (100KB):**
+----
+Throughput: 850 msg/sec (83 MB/sec)
+Latency p50: 120ms, p95: 250ms, p99: 400ms
+CPU: 2.1 cores, Memory: 1.5GB
+----
+
+== Next Steps
+
+* Try different message sizes and throughput targets
+* Experiment with multiple partitions
+* Test consumer group behavior
+* Compare with native Kafka
+* Integrate into CI/CD pipeline
+* Create custom test scenarios with k6
+
+== See Also
+
+* link:../kafka-cli/README.adoc[Kafka CLI Tools Demo]
+* link:../grafana/README.adoc[Grafana Metrics Demo]
+* link:../../README.adoc[Korvet Project README]
