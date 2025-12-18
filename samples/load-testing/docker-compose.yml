@@ -1,3 +1,6 @@
+include:
+  - ../../observability/docker-compose.yml
+
 services:
   redis:
     image: redis:latest
@@ -5,7 +8,7 @@ services:
       - "6379:6379"
 
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:early-access
     ports:
       - "9092:9092"
       - "8080:8080"
@@ -17,37 +20,10 @@ services:
       - KORVET_SERVER_PORT=9092
       - KORVET_REDIS_METRICS_ENABLED=true
       - KORVET_REDIS_METRICS_HISTOGRAM=true
-      - BPL_JVM_THREAD_COUNT=250
+      - BPL_JVM_THREAD_COUNT=50
       - JAVA_TOOL_OPTIONS=-XX:MaxDirectMemorySize=512m
     depends_on:
       - redis
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    depends_on:
-      - korvet
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-      - ./grafana-dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
-      - ./dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
 
   kafka-tools:
     image: confluentinc/cp-kafka:7.8.0

@@ -1,11 +1,11 @@
-.PHONY: help up down clean logs test-producer test-consumer test-baseline test-high-throughput test-large-messages test-consumer-group test-sustained dashboard metrics status
+.PHONY: help up down clean logs test-producer test-consumer test-baseline test-high-throughput test-large-messages test-consumer-group test-sustained test-concurrent dashboard metrics status
 
 help:
 	@echo "Korvet Load Testing Makefile"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make up                    - Start all services"
-	@echo "  make down                  - Stop all services"
+	@echo "  make down                  - Stop all services"  
 	@echo "  make clean                 - Stop services and remove volumes"
 	@echo "  make logs                  - View logs from all services"
 	@echo "  make status                - Check service status"
@@ -14,6 +14,7 @@ help:
 	@echo "  make test-producer         - Run producer performance test"
 	@echo "  make test-consumer         - Run consumer performance test"
 	@echo "  make test-basic            - Run basic end-to-end test"
+	@echo "  make test-concurrent       - Run concurrent producer/consumer test"
 	@echo ""
 	@echo "Test Scenarios:"
 	@echo "  make test-baseline         - Baseline performance (100K msgs, 1KB, 10K/sec)"
@@ -108,6 +109,33 @@ test-basic:
 	@echo ""
 	@echo "✓ Basic test complete!"
 
+# Concurrent producer/consumer test
+test-concurrent:
+	@echo "=== Concurrent Producer/Consumer Test ==="
+	@echo "This runs producer and consumer at the same time to test steady-state performance"
+	@echo ""
+	@echo "Starting consumer in background..."
+	@docker compose exec -d kafka-tools kafka-consumer-perf-test \
+		--topic concurrent-test \
+		--messages 5000000 \
+		--bootstrap-server korvet:9092 \
+		--group concurrent-consumer
+	@sleep 5
+	@echo "Starting producer (5M messages, 50k msg/sec - will run ~100 seconds)..."
+	@docker compose exec kafka-tools kafka-producer-perf-test \
+		--topic concurrent-test \
+		--num-records 5000000 \
+		--record-size 1024 \
+		--throughput 50000 \
+		--producer-props bootstrap.servers=korvet:9092
+	@echo ""
+	@echo "Checking consumer lag..."
+	@sleep 5
+	@docker compose exec kafka-tools kafka-consumer-groups \
+		--bootstrap-server korvet:9092 \
+		--group concurrent-consumer \
+		--describe || true
+
 # Test Scenarios
 test-load:
 	@echo "=== Load Test ==="
@@ -119,7 +147,7 @@ test-load:
 	@echo ""
 	docker compose exec kafka-tools kafka-producer-perf-test \
 		--topic load-test \
-		--num-records 10000000 \
+		--num-records 50000000 \
 		--record-size 1024 \
 		--throughput -1 \
 		--producer-props bootstrap.servers=korvet:9092
@@ -127,7 +155,7 @@ test-load:
 	@echo "Consuming messages..."
 	docker compose exec kafka-tools kafka-consumer-perf-test \
 		--topic load-test \
-		--messages 10000000 \
+		--messages 50000000 \
 		--bootstrap-server korvet:9092 \
 		--group load-consumer
 
@@ -141,7 +169,7 @@ test-baseline:
 	@echo ""
 	docker compose exec kafka-tools kafka-producer-perf-test \
 		--topic baseline-test \
-		--num-records 1000000 \
+		--num-records 5000000 \
 		--record-size 1024 \
 		--throughput 10000 \
 		--producer-props bootstrap.servers=korvet:9092
@@ -149,7 +177,7 @@ test-baseline:
 	@echo "Consuming messages..."
 	docker compose exec kafka-tools kafka-consumer-perf-test \
 		--topic baseline-test \
-		--messages 1000000 \
+		--messages 5000000 \
 		--bootstrap-server korvet:9092 \
 		--group baseline-consumer
 
