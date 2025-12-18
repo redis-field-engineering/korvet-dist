@@ -1,0 +1,54 @@
+= Korvet Observability
+
+Reusable observability configuration for Korvet monitoring with Prometheus and Grafana.
+
+== Contents
+
+* `prometheus.yml` - Prometheus scrape configuration for Korvet metrics
+* `grafana-datasources.yml` - Grafana datasource configuration (Prometheus)
+* `grafana-dashboards.yml` - Grafana dashboard provisioning configuration
+* `dashboards/korvet-dashboard.json` - Korvet performance dashboard
+
+== Usage
+
+This directory contains the canonical observability configuration used by all samples.
+Samples symlink to these files to avoid duplication.
+
+=== In Your Own Setup
+
+You can copy these files to your own deployment:
+
+[source,bash]
+----
+# Copy observability configs
+cp -r observability /path/to/your/deployment/
+
+# Update docker-compose.yml to mount them
+services:
+  prometheus:
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  
+  grafana:
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+----
+
+== Dashboard Metrics
+
+The Korvet dashboard includes:
+
+* **Message Rates**: Produce and fetch rates (messages/sec) using `irate()` for real-time metrics
+* **Latency**: P50, P95, P99 latency percentiles for produce and fetch operations
+* **Throughput**: Ingress and egress bytes/sec
+* **Redis Metrics**: Command rates, latency percentiles, connection pool stats
+* **JVM Metrics**: Heap usage, GC activity, thread counts
+
+== Customization
+
+To customize the dashboard:
+
+1. Edit `dashboards/korvet-dashboard.json` directly, or
+2. Import into Grafana, make changes via UI, then export and save back to this file

@@ -9,5 +9,4 @@ scrape_configs:
       - targets: ['korvet:8080']
         labels:
           application: 'korvet'
-          environment: 'demo'
-
+          environment: 'korvet'

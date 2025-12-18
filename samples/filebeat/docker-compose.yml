@@ -15,11 +15,12 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet
+    image: redisfield/korvet:latest
     container_name: korvet-sample-server
     ports:
       - "9092:9092"
       - "8080:8080"  # Actuator endpoints
+    mem_limit: 2g
     environment:
       # Redis connection
       KORVET_REDIS_HOST: redis
@@ -30,8 +31,9 @@ services:
       KORVET_SERVER_PORT: 9092
       KORVET_SERVER_ADVERTISED_HOST: korvet  # Advertise container name for inter-container communication
 
-      # Message format
-      KORVET_MESSAGE_FORMAT_DEFAULT: AUTO
+      # JVM configuration
+      BPL_JVM_THREAD_COUNT: 250
+      JAVA_TOOL_OPTIONS: -XX:MaxDirectMemorySize=512m
 
       # Logging
       LOGGING_LEVEL_ROOT: INFO
