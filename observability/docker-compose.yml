@@ -5,7 +5,7 @@
 
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -15,7 +15,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana
     ports:
       - "3000:3000"
     environment:

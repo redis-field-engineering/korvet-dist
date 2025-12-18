@@ -2,54 +2,23 @@ services:
   # Redis - Backend storage for Korvet
   redis:
     image: redis
-    container_name: korvet-sample-redis
     ports:
       - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - korvet-network
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet:latest
-    container_name: korvet-sample-server
+    image: redisfield/korvet
     ports:
       - "9092:9092"
-      - "8080:8080"  # Actuator endpoints
-    mem_limit: 2g
     environment:
-      # Redis connection
       KORVET_REDIS_HOST: redis
-      KORVET_REDIS_PORT: 6379
-
-      # Server configuration
-      KORVET_SERVER_HOST: 0.0.0.0
-      KORVET_SERVER_PORT: 9092
-      KORVET_SERVER_ADVERTISED_HOST: korvet  # Advertise container name for inter-container communication
-
-      # JVM configuration
-      BPL_JVM_THREAD_COUNT: 250
-      JAVA_TOOL_OPTIONS: -XX:MaxDirectMemorySize=512m
-
-      # Logging
-      LOGGING_LEVEL_ROOT: INFO
-      LOGGING_LEVEL_COM_REDIS_KORVET: DEBUG
+      KORVET_SERVER_ADVERTISED_HOST: korvet
     depends_on:
-      redis:
-        condition: service_healthy
-    # Note: Paketo buildpack images don't include curl/wget, so we can't use HTTP health checks
-    # The application logs show it starts successfully, so we rely on the start_period
-    networks:
-      - korvet-network
+      - redis
 
   # Filebeat - Log shipper
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.11.0
-    container_name: korvet-sample-filebeat
     user: root
     volumes:
       - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
@@ -57,15 +26,11 @@ services:
       - filebeat-data:/usr/share/filebeat/data
     command: filebeat -e -strict.perms=false
     depends_on:
-      korvet:
-        condition: service_started
-    networks:
-      - korvet-network
+      - korvet
 
   # Logstash - Log processor and consumer
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.0
-    container_name: korvet-sample-logstash
     user: root
     volumes:
       - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
@@ -74,15 +39,11 @@ services:
       XPACK_MONITORING_ENABLED: "false"
       LOG_LEVEL: "info"
     depends_on:
-      korvet:
-        condition: service_started
-    networks:
-      - korvet-network
+      - korvet
 
   # Log Generator - Generates sample application logs
   log-generator:
     image: alpine
-    container_name: korvet-sample-log-generator
     volumes:
       - logs:/logs
     command: >
@@ -123,20 +84,8 @@ services:
           sleep 2;
         done
       "
-    networks:
-      - korvet-network
 
 volumes:
-  redis-data:
-    driver: local
   logs:
-    driver: local
   filebeat-data:
-    driver: local
   logstash-output:
-    driver: local
-
-networks:
-  korvet-network:
-    driver: bridge
-
