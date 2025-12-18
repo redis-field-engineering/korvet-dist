@@ -12,29 +12,41 @@ Reusable observability configuration for Korvet monitoring with Prometheus and G
 == Usage
 
 This directory contains the canonical observability configuration used by all samples.
-Samples symlink to these files to avoid duplication.
 
-=== In Your Own Setup
+=== Using with Docker Compose
 
-You can copy these files to your own deployment:
+Include the observability stack in your `docker-compose.yml`:
 
-[source,bash]
+[source,yaml]
 ----
-# Copy observability configs
-cp -r observability /path/to/your/deployment/
+include:
+  - ../../observability/docker-compose.yml
 
-# Update docker-compose.yml to mount them
 services:
-  prometheus:
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  
-  grafana:
-    volumes:
-      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-      - ./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  korvet:
+    image: redisfield/korvet:latest
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      - KORVET_REDIS_HOST=redis
+      - KORVET_REDIS_METRICS_ENABLED=true
+    depends_on:
+      - redis
 ----
+
+This automatically adds Prometheus (port 9090) and Grafana (port 3000) to your stack.
+
+=== Accessing the Dashboard
+
+1. Start your services: `docker compose up -d`
+2. Open Grafana: http://localhost:3000
+3. The Korvet dashboard loads automatically (no login required)
 
 == Dashboard Metrics
 
