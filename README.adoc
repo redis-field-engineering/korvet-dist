@@ -166,3 +166,13 @@ Target performance metrics:
 
 Fast, nimble, and efficient—just like our streaming service.
 
+
+== License
+
+Korvet is licensed under the https://github.com/redis-field-engineering/korvet-dist/blob/main/LICENSE[Business Source License 1.1].
+
+* **Production use** is permitted only with Redis Community Edition, Redis Cloud, or Redis Software
+* **Non-production use** (development, testing) is unrestricted
+* **Change license**: Converts to MIT license four years after each version's publication
+
+See the link:LICENSE[LICENSE] file for complete terms.
