@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-tools
+  labels:
+    app: kafka-tools
+spec:
+  containers:
+    - name: kafka-tools
+      image: apache/kafka
+      command: ["sleep", "infinity"]
+      env:
+        - name: BOOTSTRAP_SERVERS
+          value: "korvet:9092"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+

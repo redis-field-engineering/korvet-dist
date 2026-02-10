@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: korvet
+  labels:
+    app: korvet
+spec:
+  # Headless service for direct pod access
+  # Kafka clients will use individual pod IPs as bootstrap servers
+  clusterIP: None
+  selector:
+    app: korvet
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: kafka
+    - port: 8080
+      targetPort: 8080
+      name: http
+

@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: korvet-benchmark
+
+resources:
+  - ../../base
+
+# 8 parallel producers
+patches:
+  - target:
+      kind: Job
+      name: benchmark-producer
+    patch: |-
+      - op: replace
+        path: /spec/parallelism
+        value: 8
+      - op: replace
+        path: /spec/completions
+        value: 8
+
+commonLabels:
+  benchmark.korvet.io/dimension: producers
+  benchmark.korvet.io/value: "8"
+

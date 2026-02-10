@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-config
+data:
+  # Test parameters
+  NUM_RECORDS: "1000000"
+  RECORD_SIZE: "1024"
+  THROUGHPUT: "-1"
+  
+  # Producer configuration
+  BATCH_SIZE: "16384"
+  LINGER_MS: "0"
+  ACKS: "1"
+  
+  # Topic configuration
+  TOPIC: "benchmark-test"
+

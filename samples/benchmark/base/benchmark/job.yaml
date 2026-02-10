@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark-producer
+  labels:
+    app: benchmark
+    component: producer
+spec:
+  # Parallelism controlled by overlays
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: benchmark
+        component: producer
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: benchmark-results
+        - name: scripts
+          configMap:
+            name: benchmark-scripts
+            defaultMode: 0755
+      containers:
+        - name: producer
+          image: apache/kafka
+          command: ["/bin/bash", "/scripts/run-benchmark.sh"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: BOOTSTRAP_SERVERS
+              value: "korvet:9092"
+          envFrom:
+            - configMapRef:
+                name: benchmark-config
+          volumeMounts:
+            - name: results
+              mountPath: /results
+            - name: scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+

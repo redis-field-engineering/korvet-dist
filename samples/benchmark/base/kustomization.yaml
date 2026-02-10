@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: korvet-benchmark
+
+resources:
+  - namespace.yaml
+  - redis-enterprise/redb.yaml
+  - korvet/configmap.yaml
+  - korvet/service.yaml
+  - korvet/deployment.yaml
+  - benchmark/configmap.yaml
+  - benchmark/scripts-configmap.yaml
+  - benchmark/pvc.yaml
+  - benchmark/job.yaml
+  - kafka-tools/pod.yaml
+  # Uncomment if Prometheus Operator is installed
+  # - observability/servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: korvet-benchmark
+

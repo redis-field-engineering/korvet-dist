@@ -1,0 +1,17 @@
+# ServiceMonitor for Prometheus Operator
+# Requires Prometheus Operator to be installed in the cluster
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: korvet
+  labels:
+    app: korvet
+spec:
+  selector:
+    matchLabels:
+      app: korvet
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+

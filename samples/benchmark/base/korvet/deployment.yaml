@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: korvet
+  labels:
+    app: korvet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: korvet
+  template:
+    metadata:
+      labels:
+        app: korvet
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: korvet
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: korvet
+          image: redisfield/korvet
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 8080
+              name: http
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: KORVET_SERVER_ADVERTISED_HOST
+              value: "$(POD_IP)"
+          envFrom:
+            - configMapRef:
+                name: korvet-config
+            - secretRef:
+                name: korvet-db
+                optional: true
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+

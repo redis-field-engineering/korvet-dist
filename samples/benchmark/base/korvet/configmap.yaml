@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: korvet-config
+data:
+  # Redis connection - uses REDB service created by Redis Enterprise Operator
+  # The service name follows pattern: <redb-name>
+  KORVET_REDIS_HOST: "korvet-db"
+  KORVET_REDIS_PORT: "12000"
+  KORVET_REDIS_CLUSTER: "true"
+  
+  # Server configuration
+  KORVET_SERVER_WORKER_THREADS: "0"
+  KORVET_SERVER_BOSS_THREADS: "1"
+  KORVET_SERVER_DEFAULT_PARTITIONS: "1"
+  KORVET_SERVER_DEFAULT_COMPRESSION: "NONE"
+  
+  # Message format
+  KORVET_MESSAGE_FORMAT_DEFAULT: "AUTO"
+  
+  # Metrics
+  KORVET_REDIS_METRICS_ENABLED: "true"
+  KORVET_REDIS_METRICS_HISTOGRAM: "true"
+

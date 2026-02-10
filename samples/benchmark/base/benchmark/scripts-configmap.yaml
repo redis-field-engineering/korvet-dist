@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-scripts
+data:
+  run-benchmark.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "=== Korvet Benchmark Producer ==="
+    echo "Pod: $POD_NAME"
+    echo "Bootstrap servers: $BOOTSTRAP_SERVERS"
+    echo "Topic: $TOPIC"
+    echo "Records: $NUM_RECORDS"
+    echo "Record size: $RECORD_SIZE bytes"
+    echo "Batch size: $BATCH_SIZE bytes"
+    echo "Throughput: $THROUGHPUT"
+    echo ""
+    
+    # Wait for Korvet to be ready
+    echo "Waiting for Korvet to be ready..."
+    until kafka-broker-api-versions --bootstrap-server $BOOTSTRAP_SERVERS > /dev/null 2>&1; do
+      echo "  Korvet not ready, waiting..."
+      sleep 5
+    done
+    echo "Korvet is ready!"
+    echo ""
+    
+    # Create timestamp for this run
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    RESULT_FILE="/results/${TIMESTAMP}-${POD_NAME}.json"
+    
+    echo "=== Running Producer Performance Test ==="
+    
+    # Run producer perf test and capture output
+    OUTPUT=$(kafka-producer-perf-test \
+      --topic $TOPIC \
+      --num-records $NUM_RECORDS \
+      --record-size $RECORD_SIZE \
+      --throughput $THROUGHPUT \
+      --producer-props \
+        bootstrap.servers=$BOOTSTRAP_SERVERS \
+        batch.size=$BATCH_SIZE \
+        linger.ms=$LINGER_MS \
+        acks=$ACKS 2>&1)
+    
+    echo "$OUTPUT"
+    
+    # Parse output and save as JSON
+    # Example output: "1000000 records sent, 125000.5 records/sec (122.07 MB/sec), 8.5 ms avg latency, 125.0 ms max latency, 5 ms 50th, 25 ms 95th, 50 ms 99th, 100 ms 99.9th."
+    RECORDS_SEC=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= records/sec)' | tail -1)
+    MB_SEC=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= MB/sec)' | tail -1)
+    AVG_LATENCY=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms avg latency)' | tail -1)
+    MAX_LATENCY=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms max latency)' | tail -1)
+    P50=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 50th)' | tail -1)
+    P95=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 95th)' | tail -1)
+    P99=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 99th)' | tail -1)
+    P999=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 99.9th)' | tail -1)
+    
+    # Write JSON result
+    cat > "$RESULT_FILE" << EOF
+    {
+      "timestamp": "$(date -Iseconds)",
+      "pod": "$POD_NAME",
+      "config": {
+        "num_records": $NUM_RECORDS,
+        "record_size": $RECORD_SIZE,
+        "batch_size": $BATCH_SIZE,
+        "throughput": $THROUGHPUT,
+        "topic": "$TOPIC"
+      },
+      "results": {
+        "records_per_sec": ${RECORDS_SEC:-0},
+        "mb_per_sec": ${MB_SEC:-0},
+        "avg_latency_ms": ${AVG_LATENCY:-0},
+        "max_latency_ms": ${MAX_LATENCY:-0},
+        "p50_latency_ms": ${P50:-0},
+        "p95_latency_ms": ${P95:-0},
+        "p99_latency_ms": ${P99:-0},
+        "p999_latency_ms": ${P999:-0}
+      }
+    }
+    EOF
+    
+    echo ""
+    echo "=== Results saved to $RESULT_FILE ==="
+    cat "$RESULT_FILE"
+
