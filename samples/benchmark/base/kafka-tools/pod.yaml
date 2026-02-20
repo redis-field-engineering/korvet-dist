@@ -5,6 +5,10 @@ metadata:
   labels:
     app: kafka-tools
 spec:
+  volumes:
+    - name: results
+      persistentVolumeClaim:
+        claimName: benchmark-results
   containers:
     - name: kafka-tools
       image: apache/kafka
@@ -12,6 +16,9 @@ spec:
       env:
         - name: BOOTSTRAP_SERVERS
           value: "korvet:9092"
+      volumeMounts:
+        - name: results
+          mountPath: /results
       resources:
         requests:
           cpu: "100m"

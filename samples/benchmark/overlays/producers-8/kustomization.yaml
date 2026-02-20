@@ -19,7 +19,8 @@ patches:
         path: /spec/completions
         value: 8
 
-commonLabels:
-  benchmark.korvet.io/dimension: producers
-  benchmark.korvet.io/value: "8"
+labels:
+  - pairs:
+      benchmark.korvet.io/dimension: producers
+      benchmark.korvet.io/value: "8"
 

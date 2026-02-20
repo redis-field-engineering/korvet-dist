@@ -1,0 +1,75 @@
+# Kubernetes Job for Korvet Flink Cold Storage Writer
+# Alternative to FlinkDeployment for environments without Flink Kubernetes Operator
+# Runs a standalone Flink job (no cluster mode)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: korvet-flink-cold-storage
+  labels:
+    app: korvet-flink
+    component: cold-storage-writer
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: korvet-flink
+        component: cold-storage-writer
+    spec:
+      serviceAccountName: korvet-flink
+      restartPolicy: OnFailure
+      containers:
+        - name: korvet-flink
+          image: redisfield/korvet-flink:latest
+          envFrom:
+            - configMapRef:
+                name: korvet-flink-config
+            - secretRef:
+                name: korvet-flink-secret
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: korvet-flink-secret
+                  key: AWS_ACCESS_KEY_ID
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: korvet-flink-secret
+                  key: AWS_SECRET_ACCESS_KEY
+                  optional: true
+          command:
+            - /docker-entrypoint.sh
+            - standalone-job
+            - --job-classname
+            - com.redis.korvet.flink.FlinkStreamWriter
+            - --
+            - --redis-uri
+            - $(REDIS_URI)
+            - --storage-path
+            - $(STORAGE_PATH)
+            - --key-pattern
+            - $(KEY_PATTERN)
+            - --consumer-group
+            - $(CONSUMER_GROUP)
+            - --boundedness
+            - BOUNDED  # Use BOUNDED for one-time archival job
+            - --checkpoint-interval-ms
+            - $(CHECKPOINT_INTERVAL_MS)
+            - --s3-region
+            - $(S3_REGION)
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          volumeMounts:
+            - name: tmp-data
+              mountPath: /tmp/delta
+      volumes:
+        - name: tmp-data
+          emptyDir: {}
+

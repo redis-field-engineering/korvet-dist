@@ -5,7 +5,7 @@ namespace: korvet-benchmark
 
 resources:
   - namespace.yaml
-  - redis-enterprise/redb.yaml
+  # REDB is applied separately to redis namespace (see redb.yaml)
   - korvet/configmap.yaml
   - korvet/service.yaml
   - korvet/deployment.yaml
@@ -17,6 +17,7 @@ resources:
   # Uncomment if Prometheus Operator is installed
   # - observability/servicemonitor.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: korvet-benchmark
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: korvet-benchmark
 

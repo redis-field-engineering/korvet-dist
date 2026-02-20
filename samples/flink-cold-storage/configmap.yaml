@@ -1,0 +1,32 @@
+# ConfigMap for Korvet Flink Cold Storage Writer
+# Contains non-sensitive configuration parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: korvet-flink-config
+  labels:
+    app: korvet-flink
+    component: cold-storage-writer
+data:
+  # Redis connection (use redis-secret for password if needed)
+  REDIS_URI: "redis://redis:6379"
+  
+  # Storage configuration
+  STORAGE_PATH: "s3a://korvet-bucket/delta"
+  
+  # Stream configuration
+  KEY_PATTERN: "korvet:*"
+  CONSUMER_GROUP: "korvet-storage"
+  OFFSET: "0-0"
+  
+  # Flink job parameters
+  CHECKPOINT_INTERVAL_MS: "1000"
+  BOUNDEDNESS: "CONTINUOUS_UNBOUNDED"
+  READ_BLOCK_MS: "100"
+  READ_COUNT: "100"
+  
+  # S3 configuration (endpoint for MinIO/LocalStack)
+  S3_REGION: "us-east-1"
+  # Uncomment for MinIO/LocalStack:
+  # S3_ENDPOINT: "http://minio:9000"
+

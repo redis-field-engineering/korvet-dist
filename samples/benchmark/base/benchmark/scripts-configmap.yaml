@@ -19,13 +19,18 @@ data:
     
     # Wait for Korvet to be ready
     echo "Waiting for Korvet to be ready..."
-    until kafka-broker-api-versions --bootstrap-server $BOOTSTRAP_SERVERS > /dev/null 2>&1; do
+    until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server $BOOTSTRAP_SERVERS > /dev/null 2>&1; do
       echo "  Korvet not ready, waiting..."
       sleep 5
     done
     echo "Korvet is ready!"
     echo ""
-    
+
+    # Create topic with explicit partition count
+    echo "Creating topic $TOPIC with $NUM_PARTITIONS partitions..."
+    /opt/kafka/bin/kafka-topics.sh --create --topic $TOPIC --partitions $NUM_PARTITIONS --bootstrap-server $BOOTSTRAP_SERVERS --if-not-exists 2>/dev/null || true
+    echo ""
+
     # Create timestamp for this run
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     RESULT_FILE="/results/${TIMESTAMP}-${POD_NAME}.json"
@@ -33,7 +38,7 @@ data:
     echo "=== Running Producer Performance Test ==="
     
     # Run producer perf test and capture output
-    OUTPUT=$(kafka-producer-perf-test \
+    OUTPUT=$(/opt/kafka/bin/kafka-producer-perf-test.sh \
       --topic $TOPIC \
       --num-records $NUM_RECORDS \
       --record-size $RECORD_SIZE \
@@ -46,16 +51,16 @@ data:
     
     echo "$OUTPUT"
     
-    # Parse output and save as JSON
+    # Parse output and save as JSON (using sed for BusyBox compatibility)
     # Example output: "1000000 records sent, 125000.5 records/sec (122.07 MB/sec), 8.5 ms avg latency, 125.0 ms max latency, 5 ms 50th, 25 ms 95th, 50 ms 99th, 100 ms 99.9th."
-    RECORDS_SEC=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= records/sec)' | tail -1)
-    MB_SEC=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= MB/sec)' | tail -1)
-    AVG_LATENCY=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms avg latency)' | tail -1)
-    MAX_LATENCY=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms max latency)' | tail -1)
-    P50=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 50th)' | tail -1)
-    P95=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 95th)' | tail -1)
-    P99=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 99th)' | tail -1)
-    P999=$(echo "$OUTPUT" | grep -oP '[\d.]+(?= ms 99.9th)' | tail -1)
+    RECORDS_SEC=$(echo "$OUTPUT" | sed -n 's/.*[, ]\([0-9.]*\) records\/sec.*/\1/p' | tail -1)
+    MB_SEC=$(echo "$OUTPUT" | sed -n 's/.*(\([0-9.]*\) MB\/sec).*/\1/p' | tail -1)
+    AVG_LATENCY=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms avg latency.*/\1/p' | tail -1)
+    MAX_LATENCY=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms max latency.*/\1/p' | tail -1)
+    P50=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms 50th.*/\1/p' | tail -1)
+    P95=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms 95th.*/\1/p' | tail -1)
+    P99=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms 99th,.*/\1/p' | tail -1)
+    P999=$(echo "$OUTPUT" | sed -n 's/.* \([0-9.]*\) ms 99.9th.*/\1/p' | tail -1)
     
     # Write JSON result
     cat > "$RESULT_FILE" << EOF
@@ -86,3 +91,71 @@ data:
     echo "=== Results saved to $RESULT_FILE ==="
     cat "$RESULT_FILE"
 
+  run-consumer-benchmark.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "=== Korvet Benchmark Consumer ==="
+    echo "Pod: $POD_NAME"
+    echo "Bootstrap servers: $BOOTSTRAP_SERVERS"
+    echo "Topic: $TOPIC"
+    echo "Messages: $NUM_RECORDS"
+    echo "Timeout: ${CONSUMER_TIMEOUT:-60} seconds"
+    echo ""
+
+    # Wait for Korvet to be ready
+    echo "Waiting for Korvet to be ready..."
+    until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server $BOOTSTRAP_SERVERS > /dev/null 2>&1; do
+      echo "  Korvet not ready, waiting..."
+      sleep 5
+    done
+    echo "Korvet is ready!"
+    echo ""
+
+    # Wait for topic to exist
+    echo "Waiting for topic $TOPIC..."
+    until /opt/kafka/bin/kafka-topics.sh --describe --topic $TOPIC --bootstrap-server $BOOTSTRAP_SERVERS > /dev/null 2>&1; do
+      echo "  Topic not ready, waiting..."
+      sleep 2
+    done
+    echo "Topic is ready!"
+    echo ""
+
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    RESULT_FILE="/results/${TIMESTAMP}-consumer-${POD_NAME}.json"
+
+    echo "=== Running Consumer Performance Test ==="
+
+    # Run consumer perf test with timeout
+    OUTPUT=$(/opt/kafka/bin/kafka-consumer-perf-test.sh \
+      --bootstrap-server $BOOTSTRAP_SERVERS \
+      --topic $TOPIC \
+      --messages $NUM_RECORDS \
+      --timeout ${CONSUMER_TIMEOUT:-60000} \
+      --group "${CONSUMER_GROUP:-benchmark-consumers}" 2>&1) || true
+
+    echo "$OUTPUT"
+
+    # Parse output - format: start.time, end.time, data.consumed.in.MB, MB.sec, data.consumed.in.nMsg, nMsg.sec, rebalance.time.ms, fetch.time.ms, fetch.MB.sec, fetch.nMsg.sec
+    MB_SEC=$(echo "$OUTPUT" | grep -v "^start.time" | tail -1 | awk -F',' '{print $4}' | tr -d ' ')
+    MSGS_SEC=$(echo "$OUTPUT" | grep -v "^start.time" | tail -1 | awk -F',' '{print $6}' | tr -d ' ')
+
+    cat > "$RESULT_FILE" << EOF
+    {
+      "timestamp": "$(date -Iseconds)",
+      "pod": "$POD_NAME",
+      "type": "consumer",
+      "config": {
+        "num_records": $NUM_RECORDS,
+        "topic": "$TOPIC"
+      },
+      "results": {
+        "records_per_sec": ${MSGS_SEC:-0},
+        "mb_per_sec": ${MB_SEC:-0}
+      }
+    }
+    EOF
+
+    echo ""
+    echo "=== Results saved to $RESULT_FILE ==="
+    cat "$RESULT_FILE"

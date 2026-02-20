@@ -4,7 +4,7 @@ metadata:
   name: benchmark-config
 data:
   # Test parameters
-  NUM_RECORDS: "1000000"
+  NUM_RECORDS: "100000"
   RECORD_SIZE: "1024"
   THROUGHPUT: "-1"
   
@@ -15,4 +15,5 @@ data:
   
   # Topic configuration
   TOPIC: "benchmark-test"
+  NUM_PARTITIONS: "32"
 

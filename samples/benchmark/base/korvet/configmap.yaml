@@ -3,11 +3,10 @@ kind: ConfigMap
 metadata:
   name: korvet-config
 data:
-  # Redis connection - uses REDB service created by Redis Enterprise Operator
-  # The service name follows pattern: <redb-name>
-  KORVET_REDIS_HOST: "korvet-db"
+  # Redis connection - Docker Redis Enterprise on host
+  KORVET_REDIS_HOST: "host.docker.internal"
   KORVET_REDIS_PORT: "12000"
-  KORVET_REDIS_CLUSTER: "true"
+  KORVET_REDIS_CLUSTER: "false"
   
   # Server configuration
   KORVET_SERVER_WORKER_THREADS: "0"

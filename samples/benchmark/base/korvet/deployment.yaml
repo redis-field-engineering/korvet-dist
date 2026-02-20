@@ -46,12 +46,15 @@ spec:
                   fieldPath: status.podIP
             - name: KORVET_SERVER_ADVERTISED_HOST
               value: "$(POD_IP)"
+            - name: KORVET_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: korvet-db
+                  key: password
+                  optional: true
           envFrom:
             - configMapRef:
                 name: korvet-config
-            - secretRef:
-                name: korvet-db
-                optional: true
           resources:
             requests:
               cpu: "1"
