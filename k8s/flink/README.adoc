@@ -54,5 +54,5 @@ For static AWS credentials, edit `secret.yaml`. On EKS with IRSA, you can omit c
 
 == Documentation
 
-See https://redis.io/docs/latest/integrate/korvet/storage/cold-storage/[Cold Storage Documentation] for details.
+See https://redis-field-engineering.github.io/korvet/storage/cold-storage.html[Cold Storage Documentation] for details.
 
