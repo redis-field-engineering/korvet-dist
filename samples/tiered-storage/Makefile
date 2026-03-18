@@ -1,5 +1,10 @@
 .PHONY: help up down clean logs test-tiered test-produce test-consume test-verify status redis-cli
 
+# Configurable parameters (matching kafka-producer-perf-test naming)
+NUM_RECORDS ?= 500
+RECORD_SIZE ?= 1024
+THROUGHPUT ?= 100
+
 help:
 	@echo "Korvet Tiered Storage Sample"
 	@echo ""
@@ -18,6 +23,13 @@ help:
 	@echo "  make test-produce - Produce messages to topic"
 	@echo "  make test-consume - Consume messages from topic"
 	@echo "  make test-verify  - Verify data in both tiers"
+	@echo ""
+	@echo "Producer Parameters:"
+	@echo "  NUM_RECORDS=500    - Number of messages to produce (default: 500)"
+	@echo "  RECORD_SIZE=1024   - Size of each message in bytes (default: 1024)"
+	@echo "  THROUGHPUT=100     - Messages per second, -1 for unlimited (default: 100)"
+	@echo ""
+	@echo "  Example: make test-produce NUM_RECORDS=10000 THROUGHPUT=500"
 	@echo ""
 	@echo "Debug:"
 	@echo "  make redis-cli    - Connect to Redis CLI"
@@ -105,28 +117,34 @@ test-tiered:
 	@echo "Step 2: Producing messages..."
 	@$(MAKE) test-produce
 	@echo ""
-	@echo "Step 3: Waiting 30 seconds for bucket rotation and archival..."
+	@echo "Step 3: Consuming messages immediately (before archival)..."
+	@$(MAKE) test-consume
+	@echo ""
+	@echo "Step 4: Waiting 30 seconds for bucket rotation and archival..."
 	@for i in 1 2 3 4 5 6; do sleep 5; echo "  $$((i*5))s elapsed..."; done
 	@echo ""
-	@echo "Step 4: Verifying data..."
+	@echo "Step 5: Verifying data archived to cold tier..."
 	@$(MAKE) test-verify
-	@echo ""
-	@echo "Step 5: Consuming messages..."
-	@$(MAKE) test-consume
 
 # Produce messages
 test-produce:
-	@echo "Producing 500 messages..."
+	@echo "Producing $(NUM_RECORDS) messages ($(RECORD_SIZE) bytes each) at $(THROUGHPUT) msg/sec..."
 	@docker compose exec kafka-tools /opt/kafka/bin/kafka-producer-perf-test.sh \
-		--topic tiered-test --num-records 500 --record-size 1024 --throughput 100 \
+		--topic tiered-test --num-records $(NUM_RECORDS) --record-size $(RECORD_SIZE) --throughput $(THROUGHPUT) \
 		--producer-props bootstrap.servers=korvet:9092
 
-# Consume messages
+# Consume messages without consumer group (direct partition read spans both tiers)
 test-consume:
-	@echo "Consuming messages..."
-	@docker compose exec kafka-tools /opt/kafka/bin/kafka-consumer-perf-test.sh \
-		--topic tiered-test --messages 500 --bootstrap-server korvet:9092 \
-		--group tiered-consumer --show-detailed-stats
+	@echo "Consuming messages (direct partition read, no consumer group)..."
+	@COUNT=$$(docker compose exec -T kafka-tools /opt/kafka/bin/kafka-console-consumer.sh \
+		--bootstrap-server korvet:9092 --topic tiered-test \
+		--partition 0 --offset earliest \
+		--max-messages $(NUM_RECORDS) --timeout-ms 30000 2>/dev/null | wc -l | tr -d ' '); \
+	if [ "$$COUNT" -ge "$(NUM_RECORDS)" ]; then \
+		echo "✓ Consumed $$COUNT messages"; \
+	else \
+		echo "⚠ Consumed only $$COUNT messages (expected $(NUM_RECORDS))"; \
+	fi
 
 # Verify data in both tiers
 test-verify:
@@ -136,7 +154,8 @@ test-verify:
 	@redis-cli -p 12000 KEYS 'korvet:stream:tiered-test:*' 2>/dev/null | head -10 || echo "  Could not connect"
 	@echo ""
 	@echo "Cold tier (MinIO/S3):"
-	@docker compose exec minio mc ls myminio/korvet/delta --recursive 2>/dev/null || echo "  No files in cold storage"
+	@docker compose exec minio mc alias set myminio http://localhost:9000 minioadmin minioadmin >/dev/null 2>&1 || true
+	@docker compose exec minio mc ls myminio/korvet/ --recursive 2>/dev/null | head -20 || echo "  No files in cold storage"
 	@echo ""
 	@echo "Archiver logs:"
 	@docker compose logs korvet 2>&1 | grep -i -E "(archived|error)" | tail -5 || echo "  No archiver logs"
