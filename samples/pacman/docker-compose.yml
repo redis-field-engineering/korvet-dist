@@ -4,6 +4,11 @@ services:
     image: redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
@@ -14,7 +19,13 @@ services:
       KORVET_REDIS_HOST: redis
       KORVET_SERVER_ADVERTISED_HOST: korvet
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
 
   # Web Server - Serves the Pac-Man game UI and handles API requests
   web:
@@ -28,7 +39,8 @@ services:
     environment:
       KAFKA_BROKER: korvet:9092
     depends_on:
-      - korvet
+      korvet:
+        condition: service_healthy
 
   # Consumer - Processes game events from Kafka
   consumer:
@@ -40,4 +52,5 @@ services:
     environment:
       KAFKA_BROKER: korvet:9092
     depends_on:
-      - korvet
+      korvet:
+        condition: service_healthy
