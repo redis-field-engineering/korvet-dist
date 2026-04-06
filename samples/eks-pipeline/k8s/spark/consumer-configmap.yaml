@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-consumer-code
+  namespace: spark
+data:
+  consumer-app.py: |
+    #!/usr/bin/env python3
+    """
+    Spark Structured Streaming Consumer for Korvet
+    Reads from Korvet using Kafka protocol with consumer group.
+    """
+    import os
+    from pyspark.sql import SparkSession
+    from pyspark.sql.functions import col, from_json
+    from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+    BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS", "korvet.korvet.svc.cluster.local:9092")
+    TOPIC = os.getenv("TOPIC", "logs")
+    GROUP_ID = os.getenv("GROUP_ID", "spark-consumer-group")
+    CHECKPOINT_LOCATION = os.getenv("CHECKPOINT_LOCATION", "/tmp/spark-checkpoint")
+
+    print(f"Starting Spark Consumer")
+    print(f"  Bootstrap servers: {BOOTSTRAP_SERVERS}")
+    print(f"  Topic: {TOPIC}")
+    print(f"  Consumer group: {GROUP_ID}")
+
+    spark = SparkSession.builder.appName("KorvetConsumer").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    log_schema = StructType([
+        StructField("timestamp", StringType()),
+        StructField("level", StringType()),
+        StructField("service", StringType()),
+        StructField("host", StringType()),
+        StructField("request_id", StringType()),
+        StructField("path", StringType()),
+        StructField("response_time_ms", IntegerType()),
+        StructField("status_code", IntegerType()),
+        StructField("bytes", IntegerType()),
+        StructField("client_ip", StringType()),
+    ])
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS) \
+        .option("subscribe", TOPIC) \
+        .option("kafka.group.id", GROUP_ID) \
+        .option("startingOffsets", "earliest") \
+        .option("failOnDataLoss", "false") \
+        .load()
+
+    parsed_df = df.select(
+        col("partition"),
+        col("offset"),
+        from_json(col("value").cast("string"), log_schema).alias("data")
+    ).select("partition", "offset", "data.*")
+
+    def process_batch(batch_df, batch_id):
+        count = batch_df.count()
+        if count > 0:
+            partition_counts = batch_df.groupBy("partition").count().collect()
+            partition_str = ", ".join([f"p{row['partition']}={row['count']}" for row in partition_counts])
+            print(f"Batch {batch_id}: {count} messages | Partitions: [{partition_str}]")
+
+    query = parsed_df.writeStream \
+        .foreachBatch(process_batch) \
+        .option("checkpointLocation", CHECKPOINT_LOCATION) \
+        .trigger(processingTime="10 seconds") \
+        .start()
+
+    print("Streaming started...")
+    query.awaitTermination()

@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-consumer-script
+  namespace: spark
+data:
+  consumer.py: |
+    #!/usr/bin/env python3
+    """Spark Structured Streaming Consumer for Korvet"""
+    import os
+    from pyspark.sql import SparkSession
+    from pyspark.sql.functions import col, from_json
+    from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+    BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS", "korvet.korvet.svc.cluster.local:9092")
+    TOPIC = os.getenv("TOPIC", "logs")
+    GROUP_ID = os.getenv("GROUP_ID", "spark-consumer-group")
+
+    print(f"Starting Spark Consumer")
+    print(f"  Bootstrap: {BOOTSTRAP_SERVERS}, Topic: {TOPIC}, Group: {GROUP_ID}")
+
+    spark = SparkSession.builder.appName("KorvetConsumer").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    log_schema = StructType([
+        StructField("timestamp", StringType()),
+        StructField("level", StringType()),
+        StructField("service", StringType()),
+        StructField("host", StringType()),
+    ])
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS) \
+        .option("subscribe", TOPIC) \
+        .option("kafka.group.id", GROUP_ID) \
+        .option("startingOffsets", "latest") \
+        .option("failOnDataLoss", "false") \
+        .load()
+
+    parsed_df = df.select(
+        col("partition"),
+        col("offset"),
+        from_json(col("value").cast("string"), log_schema).alias("data")
+    ).select("partition", "offset", "data.*")
+
+    def process_batch(batch_df, batch_id):
+        count = batch_df.count()
+        if count > 0:
+            partitions = batch_df.groupBy("partition").count().collect()
+            p_str = ", ".join([f"p{r['partition']}={r['count']}" for r in partitions])
+            print(f"Batch {batch_id}: {count} msgs | Partitions: [{p_str}]")
+
+    query = parsed_df.writeStream \
+        .foreachBatch(process_batch) \
+        .option("checkpointLocation", "/tmp/spark-checkpoint") \
+        .trigger(processingTime="10 seconds") \
+        .start()
+
+    print("Streaming started...")
+    query.awaitTermination()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-consumer
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-consumer
+  template:
+    metadata:
+      labels:
+        app: spark-consumer
+    spec:
+      containers:
+        - name: spark
+          image: apache/spark:3.5.0-python3
+          command: ["/opt/spark/bin/spark-submit"]
+          args:
+            - "--packages"
+            - "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0"
+            - "--conf"
+            - "spark.jars.ivy=/tmp/.ivy2"
+            - "--conf"
+            - "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp/.ivy2"
+            - "/opt/spark/scripts/consumer.py"
+          env:
+            - name: BOOTSTRAP_SERVERS
+              value: "korvet.korvet.svc.cluster.local:9092"
+            - name: TOPIC
+              value: "logs"
+            - name: GROUP_ID
+              value: "spark-consumer-group"
+          volumeMounts:
+            - name: script
+              mountPath: /opt/spark/scripts
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+      volumes:
+        - name: script
+          configMap:
+            name: spark-consumer-script

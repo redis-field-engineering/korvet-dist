@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spark-test-runner
+  namespace: spark
+spec:
+  serviceAccountName: spark
+  containers:
+    - name: spark
+      image: apache/spark:3.5.0-python3
+      command: ["sleep", "3600"]
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      volumeMounts:
+        - name: tests
+          mountPath: /opt/spark/tests
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: tests
+      configMap:
+        name: spark-batch-tests
+    - name: tmp
+      emptyDir: {}
+  restartPolicy: Never

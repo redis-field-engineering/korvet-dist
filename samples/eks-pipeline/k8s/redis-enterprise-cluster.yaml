@@ -1,0 +1,41 @@
+# =============================================================================
+# Redis Enterprise Cluster
+# =============================================================================
+# 3-node cluster with rack awareness across AZs
+# =============================================================================
+apiVersion: app.redislabs.com/v1
+kind: RedisEnterpriseCluster
+metadata:
+  name: rec
+  namespace: redis
+spec:
+  nodes: 3
+
+  # Schedule on dedicated Redis nodes
+  nodeSelector:
+    node-type: redis
+
+  # Tolerate the redis-enterprise taint
+  podTolerations:
+    - key: "redis-enterprise"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+  # Persistent storage (using gp3 storage class)
+  persistentSpec:
+    enabled: true
+    storageClassName: gp3
+    volumeSize: 100Gi
+
+  # Resource allocation per node
+  redisEnterpriseNodeResources:
+    limits:
+      cpu: "4"
+      memory: 16Gi
+    requests:
+      cpu: "2"
+      memory: 12Gi
+
+  # UI service type
+  uiServiceType: LoadBalancer

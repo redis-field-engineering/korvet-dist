@@ -1,0 +1,66 @@
+# =============================================================================
+# Korvet Deployment (Single Broker)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: korvet
+  namespace: korvet
+  labels:
+    app: korvet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: korvet
+  template:
+    metadata:
+      labels:
+        app: korvet
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: korvet
+      nodeSelector:
+        node-type: workloads
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: korvet
+          image: redisfield/korvet:early-access
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 8080
+              name: actuator
+          envFrom:
+            - configMapRef:
+                name: korvet-config
+          env:
+            - name: KORVET_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redb-korvet-db
+                  key: password
+            - name: JAVA_OPTS
+              value: "-Xmx2g -Xms2g -XX:MaxDirectMemorySize=512m"
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5

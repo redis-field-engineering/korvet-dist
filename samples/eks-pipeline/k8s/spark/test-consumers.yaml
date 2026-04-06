@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-test-consumers
+  namespace: spark
+data:
+  test-earliest.py: |
+    """Test 1: earliest - read from first message in cold storage"""
+    from pyspark.sql import SparkSession
+    import time
+
+    spark = SparkSession.builder.appName("Test-Earliest").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    print("=" * 60)
+    print("TEST: earliest - Reading from cold storage (oldest data)")
+    print("=" * 60)
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
+        .option("subscribe", "logs") \
+        .option("startingOffsets", "earliest") \
+        .option("kafka.group.id", "test-earliest-group") \
+        .option("failOnDataLoss", "false") \
+        .option("kafka.request.timeout.ms", "120000") \
+        .option("kafka.session.timeout.ms", "60000") \
+        .option("kafka.fetch.max.wait.ms", "60000") \
+        .load()
+
+    query = df.selectExpr("partition", "offset", "timestamp", "CAST(value AS STRING) as value") \
+        .writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("truncate", "true") \
+        .option("numRows", "5") \
+        .trigger(once=True) \
+        .start()
+
+    query.awaitTermination()
+    print("TEST COMPLETE: earliest")
+
+  test-cold-to-hot.py: |
+    """Test 2: startingTimestamp 6 min ago - transition from cold to hot"""
+    from pyspark.sql import SparkSession
+    import time
+
+    spark = SparkSession.builder.appName("Test-ColdToHot").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    # 6 minutes ago (1 min before local retention of 5 min)
+    start_ts = int((time.time() - 360) * 1000)
+    ts_json = f'{{"logs": {start_ts}}}'
+
+    print("=" * 60)
+    print(f"TEST: cold-to-hot - Starting from timestamp {start_ts}")
+    print(f"      (6 min ago, should start in cold, transition to hot)")
+    print("=" * 60)
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
+        .option("subscribe", "logs") \
+        .option("startingOffsetsByTimestamp", ts_json) \
+        .option("kafka.group.id", "test-cold-to-hot-group") \
+        .option("failOnDataLoss", "false") \
+        .option("kafka.request.timeout.ms", "120000") \
+        .option("kafka.session.timeout.ms", "60000") \
+        .load()
+
+    query = df.selectExpr("partition", "offset", "timestamp", "CAST(value AS STRING) as value") \
+        .writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("truncate", "true") \
+        .option("numRows", "5") \
+        .trigger(once=True) \
+        .start()
+
+    query.awaitTermination()
+    print("TEST COMPLETE: cold-to-hot")
+
+  test-hot-only.py: |
+    """Test 3: startingTimestamp 4 min ago - read from hot storage only"""
+    from pyspark.sql import SparkSession
+    import time
+
+    spark = SparkSession.builder.appName("Test-HotOnly").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    # 4 minutes ago (within local retention of 5 min)
+    start_ts = int((time.time() - 240) * 1000)
+    ts_json = f'{{"logs": {start_ts}}}'
+
+    print("=" * 60)
+    print(f"TEST: hot-only - Starting from timestamp {start_ts}")
+    print(f"      (4 min ago, should read only from hot storage)")
+    print("=" * 60)
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
+        .option("subscribe", "logs") \
+        .option("startingOffsetsByTimestamp", ts_json) \
+        .option("kafka.group.id", "test-hot-only-group") \
+        .option("failOnDataLoss", "false") \
+        .option("kafka.request.timeout.ms", "120000") \
+        .option("kafka.session.timeout.ms", "60000") \
+        .load()
+
+    query = df.selectExpr("partition", "offset", "timestamp", "CAST(value AS STRING) as value") \
+        .writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("truncate", "true") \
+        .option("numRows", "5") \
+        .trigger(once=True) \
+        .start()
+
+    query.awaitTermination()
+    print("TEST COMPLETE: hot-only")
+
+  test-latest.py: |
+    """Test 4: latest - read from latest message in hot storage"""
+    from pyspark.sql import SparkSession
+
+    spark = SparkSession.builder.appName("Test-Latest").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    print("=" * 60)
+    print("TEST: latest - Reading from latest offset (hot storage)")
+    print("=" * 60)
+
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
+        .option("subscribe", "logs") \
+        .option("startingOffsets", "latest") \
+        .option("kafka.group.id", "test-latest-group") \
+        .option("failOnDataLoss", "false") \
+        .option("kafka.request.timeout.ms", "120000") \
+        .option("kafka.session.timeout.ms", "60000") \
+        .load()
+
+    query = df.selectExpr("partition", "offset", "timestamp", "CAST(value AS STRING) as value") \
+        .writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("truncate", "true") \
+        .option("numRows", "5") \
+        .trigger(processingTime="5 seconds") \
+        .start()
+
+    # Run for 15 seconds to see some data
+    import time
+    time.sleep(15)
+    query.stop()
+    print("TEST COMPLETE: latest")

@@ -1,0 +1,40 @@
+# =============================================================================
+# Korvet ConfigMap
+# =============================================================================
+# Update KORVET_STORAGE_PATH with output from:
+#   terraform output s3_delta_path
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: korvet-config
+  namespace: korvet
+data:
+  # Server configuration
+  KORVET_SERVER_HOST: "0.0.0.0"
+  KORVET_SERVER_PORT: "9092"
+  KORVET_SERVER_BROKER_ID: "0"
+  KORVET_SERVER_KEYSPACE: "korvet"
+  KORVET_SERVER_ADVERTISED_HOST: "korvet.korvet.svc.cluster.local"
+  KORVET_SERVER_ADVERTISED_PORT: "9092"
+
+  # Redis Enterprise connection (OSS Cluster API)
+  KORVET_REDIS_URI: "redis://korvet-db.redis.svc.cluster.local:19750"
+  KORVET_REDIS_CLUSTER: "true"
+
+  # Tiered storage: 10 min hot (Redis), 1 day cold (S3)
+  # Replace S3_BUCKET with: terraform output s3_bucket_name
+  KORVET_STORAGE_REMOTE_PATH: "s3a://S3_BUCKET/korvet/delta"
+  # Replace REGION with your AWS region
+  KORVET_STORAGE_REMOTE_S3_REGION: "us-west-2"
+  # Use IRSA for S3 credentials (EKS IAM Roles for Service Accounts)
+  KORVET_STORAGE_REMOTE_S3_CREDENTIALS_TYPE: "IRSA"
+
+  # Archiver configuration
+  KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: "10000"
+  KORVET_STORAGE_REMOTE_ARCHIVER_WORKERS: "4"
+  KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: "PT1M"
+
+  # Retention configuration
+  KORVET_STORAGE_REMOTE_RETENTION_ENABLED: "true"
+  KORVET_STORAGE_REMOTE_RETENTION_INTERVAL: "PT1H"

@@ -1,0 +1,30 @@
+# =============================================================================
+# Redis Enterprise Database for Korvet
+# =============================================================================
+# 4-shard database with OSS Cluster API enabled
+# =============================================================================
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseDatabase
+metadata:
+  name: korvet-db
+  namespace: redis
+spec:
+  redisEnterpriseCluster:
+    name: rec
+
+  # Database configuration
+  # Note: shardCount=2 with replication=true gives 4 total shards (within trial license)
+  memorySize: 8GB
+  shardCount: 2
+  replication: true
+
+  # Enable OSS Cluster API for Korvet connection
+  ossCluster: true
+
+  # Database options
+  evictionPolicy: noeviction
+  persistence: aofEverySecond
+
+  # Enable RediSearch module for segment indexing
+  modulesList:
+    - name: search

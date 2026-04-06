@@ -1,0 +1,57 @@
+# =============================================================================
+# Logstash Deployment
+# =============================================================================
+# Data generator using Logstash generator input
+# Scale replicas to increase throughput
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: korvet
+  labels:
+    app: logstash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      nodeSelector:
+        node-type: workloads
+      containers:
+        - name: logstash
+          image: docker.elastic.co/logstash/logstash:8.12.0
+          args:
+            - "-f"
+            - "/usr/share/logstash/pipeline/logstash.conf"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: pipeline
+              mountPath: /usr/share/logstash/pipeline
+          env:
+            - name: XPACK_MONITORING_ENABLED
+              value: "false"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PIPELINE_WORKERS
+              value: "4"
+            - name: PIPELINE_BATCH_SIZE
+              value: "500"
+      volumes:
+        - name: pipeline
+          configMap:
+            name: logstash-pipeline
+            items:
+              - key: logstash.conf
+                path: logstash.conf

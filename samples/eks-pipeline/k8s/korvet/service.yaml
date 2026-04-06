@@ -1,0 +1,21 @@
+# =============================================================================
+# Korvet Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: korvet
+  namespace: korvet
+  labels:
+    app: korvet
+spec:
+  type: ClusterIP
+  selector:
+    app: korvet
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: kafka
+    - port: 8080
+      targetPort: 8080
+      name: actuator

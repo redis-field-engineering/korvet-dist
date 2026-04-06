@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-batch-tests
+  namespace: spark
+data:
+  test-all.py: |
+    """Batch tests for different starting offsets using startingOffsetsByTimestamp"""
+    from pyspark.sql import SparkSession
+    import time
+    import json
+
+    spark = SparkSession.builder.appName("TieredStorageTests").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    BOOTSTRAP = "korvet.korvet.svc.cluster.local:9092"
+    TOPIC = "logs"
+
+    def read_batch(name, starting_offsets, use_timestamp=False):
+        """Read a batch of data and show results"""
+        print("=" * 70)
+        print(f"TEST: {name}")
+        print(f"  startingOffsets: {starting_offsets}")
+        print(f"  useTimestamp: {use_timestamp}")
+        print("=" * 70)
+
+        try:
+            reader = spark.read \
+                .format("kafka") \
+                .option("kafka.bootstrap.servers", BOOTSTRAP) \
+                .option("subscribe", TOPIC) \
+                .option("endingOffsets", "latest") \
+                .option("kafka.request.timeout.ms", "300000") \
+                .option("kafka.session.timeout.ms", "120000") \
+                .option("failOnDataLoss", "false")
+
+            if use_timestamp:
+                reader = reader.option("startingOffsetsByTimestamp", starting_offsets)
+            else:
+                reader = reader.option("startingOffsets", starting_offsets)
+
+            df = reader.load()
+
+            count = df.count()
+            print(f"  Records read: {count}")
+
+            if count > 0:
+                # Show first and last records by timestamp
+                print("\n  First 3 records (oldest):")
+                df.select("partition", "offset", "timestamp") \
+                    .orderBy("timestamp") \
+                    .show(3, truncate=False)
+
+                print("  Last 3 records (newest):")
+                df.select("partition", "offset", "timestamp") \
+                    .orderBy("timestamp", ascending=False) \
+                    .show(3, truncate=False)
+
+            print(f"TEST {name}: PASSED\n")
+            return True
+        except Exception as e:
+            print(f"TEST {name}: FAILED - {e}\n")
+            return False
+
+    # Calculate timestamps (in milliseconds)
+    now_ms = int(time.time() * 1000)
+    six_min_ago = now_ms - 360000   # 6 min ago (before local retention)
+    four_min_ago = now_ms - 240000  # 4 min ago (within local retention)
+    one_min_ago = now_ms - 60000    # 1 min ago (recent hot storage)
+
+    print("\n" + "=" * 70)
+    print("TIERED STORAGE TEST SUITE")
+    print(f"Current time: {now_ms}")
+    print(f"6 min ago:    {six_min_ago} (should be in cold storage)")
+    print(f"4 min ago:    {four_min_ago} (should be in hot storage)")
+    print(f"1 min ago:    {one_min_ago} (recent hot storage)")
+    print("=" * 70 + "\n")
+
+    results = []
+
+    # Test 1: earliest - reads from cold storage (oldest available)
+    results.append(("earliest", read_batch(
+        "earliest (cold storage)",
+        "earliest",
+        use_timestamp=False
+    )))
+
+    # Test 2: 6 min ago - should start in cold, transition to hot
+    ts_json = json.dumps({"logs": {"0": six_min_ago, "1": six_min_ago, "2": six_min_ago, "3": six_min_ago}})
+    results.append(("cold-to-hot", read_batch(
+        "cold-to-hot (6 min ago, before local retention)",
+        ts_json,
+        use_timestamp=True
+    )))
+
+    # Test 3: 4 min ago - should read from hot storage only
+    ts_json = json.dumps({"logs": {"0": four_min_ago, "1": four_min_ago, "2": four_min_ago, "3": four_min_ago}})
+    results.append(("hot-only", read_batch(
+        "hot-only (4 min ago, within local retention)",
+        ts_json,
+        use_timestamp=True
+    )))
+
+    # Test 4: 1 min ago - read recent hot storage
+    ts_json = json.dumps({"logs": {"0": one_min_ago, "1": one_min_ago, "2": one_min_ago, "3": one_min_ago}})
+    results.append(("recent-hot", read_batch(
+        "recent-hot (1 min ago)",
+        ts_json,
+        use_timestamp=True
+    )))
+
+    # Summary
+    print("\n" + "=" * 70)
+    print("TEST SUMMARY")
+    print("=" * 70)
+    for name, passed in results:
+        status = "PASSED" if passed else "FAILED"
+        print(f"  {name}: {status}")
+    print("=" * 70)
