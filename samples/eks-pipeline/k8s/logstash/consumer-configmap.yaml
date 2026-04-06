@@ -26,7 +26,7 @@ data:
         consumer_threads => 1
         codec => json
         decorate_events => "extended"
-        auto_offset_reset => "latest"
+        auto_offset_reset => "earliest"
       }
     }
 
