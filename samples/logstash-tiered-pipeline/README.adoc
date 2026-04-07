@@ -1,4 +1,4 @@
-= Docker Compose Logstash Pipeline
+= Logstash Tiered Pipeline
 :toc:
 :icons: font
 
@@ -24,7 +24,7 @@ The topics are recreated with the same Korvet settings used by `samples/eks-pipe
 
 [source,bash]
 ----
-cd samples/compose-logstash-pipeline
+cd samples/logstash-tiered-pipeline
 make up
 make describe-topics
 make consume
@@ -36,7 +36,7 @@ make consume
 
 * `korvet` exposes Kafka on `localhost:9092`
 * `korvet` health is available on http://localhost:8080/actuator/health
-* cold storage files are written under `samples/compose-logstash-pipeline/data/cold`
+* cold storage files are written under `samples/logstash-tiered-pipeline/data/cold`
 
 == Notes
 

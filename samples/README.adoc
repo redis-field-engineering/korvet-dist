@@ -128,7 +128,7 @@ cd filebeat
 docker compose up -d
 ----
 
-=== link:compose-logstash-pipeline/README.adoc[Docker Compose Logstash Pipeline]
+=== link:logstash-tiered-pipeline/README.adoc[Logstash Tiered Pipeline]
 
 End-to-end local pipeline using Docker Compose with Redis, Korvet, and two Logstash instances.
 
@@ -151,7 +151,7 @@ End-to-end local pipeline using Docker Compose with Redis, Korvet, and two Logst
 
 [source,bash]
 ----
-cd samples/compose-logstash-pipeline
+cd samples/logstash-tiered-pipeline
 make up
 make consume
 ----
