@@ -57,7 +57,7 @@ down:
 	docker compose --profile pipeline down
 
 restart:
-	docker compose restart
+	docker compose --profile pipeline restart
 
 clean:
 	docker compose --profile pipeline down -v
