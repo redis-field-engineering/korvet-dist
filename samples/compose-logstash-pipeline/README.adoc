@@ -1,0 +1,62 @@
+= Docker Compose Logstash Pipeline
+:toc:
+:icons: font
+
+== Overview
+
+This sample runs a local end-to-end Korvet pipeline with Docker Compose:
+
+* `redis:latest` as the hot tier backend
+* `redisfield/korvet:early-access` with tiered storage enabled
+* A Logstash producer that generates synthetic log events into the `logs` topic
+* A Logstash consumer that reads `logs`, enriches events, and writes to `logs-processed`
+* Local filesystem cold storage mounted at `./data/cold`
+
+The topics are recreated with the same Korvet settings used by `samples/eks-pipeline`:
+
+* `bucket.duration.ms=60000` (1 minute)
+* `local.retention.ms=300000` (5 minutes)
+* `retention.ms=86400000` (1 day)
+* `remote.storage.enable=true`
+* `partitions=3`
+
+== Quick Start
+
+[source,bash]
+----
+cd samples/compose-logstash-pipeline
+make up
+make describe-topics
+make consume
+----
+
+`make up` starts Redis, Korvet, and Kafka tools first, waits until Korvet accepts Kafka admin requests, recreates the topics with the required settings, and only then starts the Logstash producer and consumer.
+
+== Services
+
+* `korvet` exposes Kafka on `localhost:9092`
+* `korvet` health is available on http://localhost:8080/actuator/health
+* cold storage files are written under `samples/compose-logstash-pipeline/data/cold`
+
+== Notes
+
+This sample uses a filesystem URI for Korvet remote storage:
+
+[source,text]
+----
+file:///var/lib/korvet/cold/delta
+----
+
+Korvet writes archived topic data to the mounted local directory instead of S3-compatible object storage.
+
+== Useful Commands
+
+[source,bash]
+----
+make logs
+make logs-korvet
+make logs-producer
+make logs-consumer
+make status
+make clean
+----
