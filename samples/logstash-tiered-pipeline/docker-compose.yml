@@ -1,0 +1,44 @@
+services:
+  redis:
+    image: redis:latest
+
+  korvet:
+    image: redisfield/korvet:early-access
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      KORVET_REDIS_HOST: redis
+      KORVET_SERVER_ADVERTISED_HOST: korvet
+      KORVET_SERVER_AUTO_CREATE_TOPICS: "false"
+      KORVET_STORAGE_REMOTE_PATH: file:///var/lib/korvet/cold/delta
+      KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: 15s
+      KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: 1000
+    volumes:
+      - ./data/cold:/var/lib/korvet/cold
+    depends_on:
+      - redis
+
+  kafka-tools:
+    image: apache/kafka:latest
+    command: sleep infinity
+    depends_on:
+      - korvet
+
+  logstash-producer:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    profiles:
+      - pipeline
+    volumes:
+      - ./producer/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - korvet
+
+  logstash-consumer:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    profiles:
+      - pipeline
+    volumes:
+      - ./consumer/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - korvet
