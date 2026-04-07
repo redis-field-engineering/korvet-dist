@@ -64,7 +64,7 @@ clean:
 	rm -rf data/cold
 
 logs:
-	docker compose logs -f
+	docker compose --profile pipeline logs -f
 
 logs-korvet:
 	docker compose logs -f korvet
@@ -76,7 +76,7 @@ logs-consumer:
 	docker compose logs -f logstash-consumer
 
 status:
-	@docker compose ps
+	@docker compose --profile pipeline ps
 	@echo ""
 	@curl -s http://localhost:8080/actuator/health 2>/dev/null || echo "Korvet health endpoint is not ready yet"
 
