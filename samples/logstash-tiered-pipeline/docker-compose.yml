@@ -1,6 +1,27 @@
 services:
-  redis:
-    image: redis:latest
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio:/data
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set myminio http://minio:9000 minioadmin minioadmin; do
+        sleep 1;
+      done;
+      mc mb myminio/korvet --ignore-existing;
+      "
 
   korvet:
     image: redisfield/korvet:early-access
@@ -8,16 +29,23 @@ services:
       - "9092:9092"
       - "8080:8080"
     environment:
-      KORVET_REDIS_HOST: redis
+      KORVET_REDIS_HOST: host.docker.internal
+      KORVET_REDIS_PORT: 12000
       KORVET_SERVER_ADVERTISED_HOST: korvet
       KORVET_SERVER_AUTO_CREATE_TOPICS: "false"
-      KORVET_STORAGE_REMOTE_PATH: file:///var/lib/korvet/cold/delta
+      KORVET_STORAGE_REMOTE_PATH: s3a://korvet/delta
+      KORVET_STORAGE_REMOTE_S3_ENDPOINT: http://minio:9000
+      KORVET_STORAGE_REMOTE_S3_REGION: us-east-1
+      KORVET_STORAGE_REMOTE_S3_CREDENTIALS_TYPE: static
+      KORVET_STORAGE_REMOTE_S3_CREDENTIALS_ACCESS_KEY_ID: minioadmin
+      KORVET_STORAGE_REMOTE_S3_CREDENTIALS_SECRET_ACCESS_KEY: minioadmin
       KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: 15s
       KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: 1000
-    volumes:
-      - ./data/cold:/var/lib/korvet/cold
     depends_on:
-      - redis
+      minio-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   kafka-tools:
     image: apache/kafka:latest
