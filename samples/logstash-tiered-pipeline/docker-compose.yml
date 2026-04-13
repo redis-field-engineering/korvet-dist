@@ -1,3 +1,23 @@
+x-logstash-consumer-base: &logstash-consumer-base
+  image: docker.elastic.co/logstash/logstash:8.11.0
+  profiles:
+    - pipeline
+  volumes:
+    - ./consumer/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+    - ./consumer:/usr/share/logstash/pipeline:ro
+  depends_on:
+    - korvet
+
+x-logstash-producer-base: &logstash-producer-base
+  image: docker.elastic.co/logstash/logstash:8.11.0
+  profiles:
+    - pipeline
+  volumes:
+    - ./producer/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+    - ./producer:/usr/share/logstash/pipeline:ro
+  depends_on:
+    - korvet
+
 services:
   minio:
     image: minio/minio
@@ -31,6 +51,10 @@ services:
     environment:
       KORVET_REDIS_HOST: host.docker.internal
       KORVET_REDIS_PORT: 12000
+      KORVET_REDIS_POOL_SIZE: 64
+      KORVET_REDIS_METADATA_POOL_SIZE: 64
+      KORVET_REDIS_ARCHIVAL_SOURCE_POOL_SIZE: 64
+      KORVET_REDIS_COMMITTED_OFFSET_POOL_SIZE: 64
       KORVET_SERVER_ADVERTISED_HOST: korvet
       KORVET_SERVER_AUTO_CREATE_TOPICS: "false"
       KORVET_STORAGE_REMOTE_PATH: s3a://korvet/delta
@@ -40,7 +64,8 @@ services:
       KORVET_STORAGE_REMOTE_S3_CREDENTIALS_ACCESS_KEY_ID: minioadmin
       KORVET_STORAGE_REMOTE_S3_CREDENTIALS_SECRET_ACCESS_KEY: minioadmin
       KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: 15s
-      KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: 1000
+      KORVET_STORAGE_REMOTE_ARCHIVER_METADATA_CHUNK_SIZE: 4
+      KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: 100000
     depends_on:
       minio-init:
         condition: service_completed_successfully
@@ -54,19 +79,7 @@ services:
       - korvet
 
   logstash-producer:
-    image: docker.elastic.co/logstash/logstash:8.11.0
-    profiles:
-      - pipeline
-    volumes:
-      - ./producer/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
-    depends_on:
-      - korvet
+    <<: *logstash-producer-base
 
   logstash-consumer:
-    image: docker.elastic.co/logstash/logstash:8.11.0
-    profiles:
-      - pipeline
-    volumes:
-      - ./consumer/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
-    depends_on:
-      - korvet
+    <<: *logstash-consumer-base

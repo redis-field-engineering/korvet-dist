@@ -9,19 +9,22 @@ This sample runs a local end-to-end Korvet pipeline with Docker Compose:
 * Redis Enterprise DB on `localhost:12000` as the hot tier backend
 * `minio/minio` as an S3-compatible cold storage backend
 * `redisfield/korvet:early-access` with tiered storage enabled against S3
-* A Logstash producer that generates synthetic log events into `logs-01` through `logs-10`
-* A Logstash consumer that reads all 10 source topics, enriches events, and writes to `logs-processed`
+* One Logstash producer container with ten pipelines, each generating synthetic log events into one of `logs-01` through `logs-10`
+* One Logstash consumer container with ten pipelines, each reading one source topic, enriching events, and writing to `logs-processed`
 
 Before Korvet starts, `make up` resets the S3 backend to an empty state by removing local MinIO data and flushes the Redis Enterprise DB on `localhost:12000` for a clean run.
 
-The 10 source topics are recreated with these Korvet settings:
+The 10 source topics are created or updated with these Korvet settings:
 
 * `bucket.duration.ms=60000` (1 minute)
 * `retention.ms=86400000` (1 day)
+* `local.retention.bytes=214748364` (80% of the default 256 MiB Redis budget)
 * `remote.storage.enable=true`
 * `partitions=4`
 
-The sample keeps a computed target of `214748364` bytes (80% of the configured 256 MiB Redis budget) in `make show-config`, but it does not apply `local.retention.bytes` automatically because the current Korvet image returns produce errors when that setting is enabled on these tiered topics.
+The `logs-processed` topic is also created or updated with:
+
+* `local.retention.bytes=214748364`
 
 == Quick Start
 
@@ -33,7 +36,7 @@ make describe-topics
 make consume
 ----
 
-`make up` starts MinIO, Korvet, and Kafka tools first, waits until Korvet accepts Kafka admin requests, recreates the topics with the required settings, and only then starts the Logstash producer and consumer.
+`make up` starts MinIO, Korvet, and Kafka tools first, waits until Korvet accepts Kafka admin requests, ensures the topics exist with the required settings, and only then starts the Logstash producer and consumer containers, each with ten topic-specific pipelines.
 It also starts MinIO on `localhost:9000` with the console on `localhost:9001`.
 
 == Services
@@ -63,26 +66,28 @@ When that happens, the usual symptoms are:
 
 * `logs-processed` stays at offset `0`
 * `kafka-console-consumer` on `logs-processed` times out
-* the Logstash consumer logs heartbeat or coordinator timeouts
+* one or more Logstash consumers log heartbeat or coordinator timeouts
 
 For a stable run, apply these Korvet environment overrides in `docker-compose.yml`:
 
 [source,yaml]
 ----
 KORVET_REDIS_POOL_SIZE: 64
-KORVET_REDIS_METADATA_POOL_SIZE: 32
-KORVET_REDIS_ARCHIVAL_SOURCE_POOL_SIZE: 16
+KORVET_REDIS_METADATA_POOL_SIZE: 64
+KORVET_REDIS_ARCHIVAL_SOURCE_POOL_SIZE: 64
+KORVET_REDIS_COMMITTED_OFFSET_POOL_SIZE: 64
 KORVET_REDIS_POOL_MAX_WAIT: 10s
 KORVET_SERVER_MAX_PENDING_BYTES: 268435456
 KORVET_SERVER_RESUME_PENDING_BYTES: 134217728
 KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: 60s
+KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: 100000
 ----
 
 These settings were validated against the current sample wiring:
 
 * Redis Enterprise DB on `localhost:12000`
 * MinIO-backed cold storage
-* Logstash consumer subscribed to `logs-(0[1-9]|10)`
+* one Logstash consumer container running ten pipelines, one per source topic
 
 == Useful Commands
 

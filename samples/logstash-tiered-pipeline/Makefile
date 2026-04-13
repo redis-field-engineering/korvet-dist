@@ -3,6 +3,9 @@
 TOPIC_COUNT ?= 10
 TOPIC_PREFIX ?= logs
 PROCESSED_TOPIC ?= logs-processed
+SOURCE_TOPICS := $(shell seq -f "$(TOPIC_PREFIX)-%02g" 1 $(TOPIC_COUNT))
+PRODUCER_SERVICES := logstash-producer
+CONSUMER_SERVICES := logstash-consumer
 PARTITIONS ?= 4
 BUCKET_DURATION_MS ?= 60000
 RETENTION_MS ?= 86400000
@@ -14,13 +17,13 @@ help:
 	@echo "Korvet Docker Compose Logstash Pipeline"
 	@echo ""
 	@echo "Setup:"
-	@echo "  make up             - Reset storage, start services, and recreate topics"
-	@echo "  make start-pipeline - Start the Logstash producer and consumer"
+	@echo "  make up             - Reset storage, start services, ensure topics/configs, and start multi-pipeline Logstash producer and consumer"
+	@echo "  make start-pipeline - Start the multi-pipeline Logstash producer and consumer"
 	@echo "  make down           - Stop services"
 	@echo "  make clean          - Stop services and remove local data"
 	@echo ""
 	@echo "Operations:"
-	@echo "  make topics         - Recreate topics with tiered storage settings"
+	@echo "  make topics         - Ensure topics exist with tiered storage settings"
 	@echo "  make describe-topics - Describe all source topics"
 	@echo "  make consume        - Read a few messages from logs-processed"
 	@echo "  make show-config    - Show computed retention settings"
@@ -29,8 +32,8 @@ help:
 	@echo "Logs:"
 	@echo "  make logs           - Follow all logs"
 	@echo "  make logs-korvet    - Follow Korvet logs"
-	@echo "  make logs-producer  - Follow producer logs"
-	@echo "  make logs-consumer  - Follow consumer logs"
+	@echo "  make logs-producer  - Follow the Logstash producer logs"
+	@echo "  make logs-consumer  - Follow the Logstash consumer logs"
 
 up:
 	@$(MAKE) prepare
@@ -48,7 +51,7 @@ up:
 	@echo "  MinIO console:  http://localhost:9001"
 
 start-pipeline:
-	docker compose --profile pipeline up -d logstash-producer logstash-consumer
+	docker compose --profile pipeline up -d $(PRODUCER_SERVICES) $(CONSUMER_SERVICES)
 
 prepare: reset-storage
 	@mkdir -p data/minio
@@ -98,10 +101,10 @@ logs-korvet:
 	docker compose logs -f korvet
 
 logs-producer:
-	docker compose logs -f logstash-producer
+	docker compose logs -f $(PRODUCER_SERVICES)
 
 logs-consumer:
-	docker compose logs -f logstash-consumer
+	docker compose logs -f $(CONSUMER_SERVICES)
 
 status:
 	@docker compose --profile pipeline ps
@@ -109,30 +112,29 @@ status:
 	@curl -s http://localhost:8080/actuator/health 2>/dev/null || echo "Korvet health endpoint is not ready yet"
 
 topics:
-	@for topic in $$(seq -f "$(TOPIC_PREFIX)-%02g" 1 $(TOPIC_COUNT)); do \
-		echo "Recreating topic $$topic..."; \
-		docker compose exec -T kafka-tools /opt/kafka/bin/kafka-topics.sh \
+	@docker compose exec -T kafka-tools sh -lc '\
+		for topic in $(SOURCE_TOPICS); do \
+			echo "Ensuring topic $$topic..."; \
+			/opt/kafka/bin/kafka-topics.sh \
+				--bootstrap-server korvet:9092 \
+				--create --if-not-exists --topic $$topic --partitions $(PARTITIONS); \
+			/opt/kafka/bin/kafka-configs.sh \
+				--bootstrap-server korvet:9092 \
+				--entity-type topics --entity-name $$topic \
+				--alter --add-config "bucket.duration.ms=$(BUCKET_DURATION_MS),retention.ms=$(RETENTION_MS),local.retention.bytes=$(LOCAL_RETENTION_BYTES),remote.storage.enable=true"; \
+		done; \
+		echo "Ensuring topic $(PROCESSED_TOPIC)..."; \
+		/opt/kafka/bin/kafka-topics.sh \
 			--bootstrap-server korvet:9092 \
-			--delete --topic $$topic >/dev/null 2>&1 || true; \
-		sleep 2; \
-		docker compose exec -T kafka-tools /opt/kafka/bin/kafka-topics.sh \
+			--create --if-not-exists --topic $(PROCESSED_TOPIC) --partitions $(PARTITIONS); \
+		/opt/kafka/bin/kafka-configs.sh \
 			--bootstrap-server korvet:9092 \
-			--create --topic $$topic --partitions $(PARTITIONS); \
-		docker compose exec -T kafka-tools /opt/kafka/bin/kafka-configs.sh \
-			--bootstrap-server korvet:9092 \
-			--entity-type topics --entity-name $$topic \
-			--alter --add-config "bucket.duration.ms=$(BUCKET_DURATION_MS),retention.ms=$(RETENTION_MS),remote.storage.enable=true"; \
-	done
-	@docker compose exec -T kafka-tools /opt/kafka/bin/kafka-topics.sh \
-		--bootstrap-server korvet:9092 \
-		--delete --topic $(PROCESSED_TOPIC) >/dev/null 2>&1 || true
-	@sleep 2
-	@docker compose exec -T kafka-tools /opt/kafka/bin/kafka-topics.sh \
-		--bootstrap-server korvet:9092 \
-		--create --topic $(PROCESSED_TOPIC) --partitions $(PARTITIONS)
+			--entity-type topics --entity-name $(PROCESSED_TOPIC) \
+			--alter --add-config "local.retention.bytes=$(LOCAL_RETENTION_BYTES)"; \
+	'
 
 describe-topics:
-	@for topic in $$(seq -f "$(TOPIC_PREFIX)-%02g" 1 $(TOPIC_COUNT)) $(PROCESSED_TOPIC); do \
+	@for topic in $(SOURCE_TOPICS) $(PROCESSED_TOPIC); do \
 		echo "=== $$topic ==="; \
 		docker compose exec -T kafka-tools /opt/kafka/bin/kafka-topics.sh \
 			--bootstrap-server korvet:9092 --describe --topic $$topic; \
