@@ -1,4 +1,4 @@
-.PHONY: help up down clean restart logs status topics consume logs-korvet logs-producer logs-consumer describe-topics start-pipeline wait-korvet prepare reset-storage flush-redis show-config
+.PHONY: help up down clean restart logs status topics consume logs-korvet logs-producer logs-consumer describe-topics start-pipeline wait-korvet prepare reset-storage flush-redis show-config render-pipelines verify-cold-storage
 
 TOPIC_COUNT ?= 10
 TOPIC_PREFIX ?= logs
@@ -7,7 +7,6 @@ SOURCE_TOPICS := $(shell seq -f "$(TOPIC_PREFIX)-%02g" 1 $(TOPIC_COUNT))
 PRODUCER_SERVICES := logstash-producer
 CONSUMER_SERVICES := logstash-consumer
 PARTITIONS ?= 4
-BUCKET_DURATION_MS ?= 60000
 RETENTION_MS ?= 86400000
 REDIS_MAXMEMORY_BYTES ?= 268435456
 LOCAL_RETENTION_BYTES ?= $(shell expr $(REDIS_MAXMEMORY_BYTES) \* 80 / 100)
@@ -26,6 +25,7 @@ help:
 	@echo "  make topics         - Ensure topics exist with tiered storage settings"
 	@echo "  make describe-topics - Describe all source topics"
 	@echo "  make consume        - Read a few messages from logs-processed"
+	@echo "  make verify-cold-storage - Verify cold-storage files exist in MinIO data"
 	@echo "  make show-config    - Show computed retention settings"
 	@echo "  make status         - Show service status and Korvet health"
 	@echo ""
@@ -55,10 +55,15 @@ start-pipeline:
 
 prepare: reset-storage
 	@mkdir -p data/minio
+	@$(MAKE) render-pipelines
+
+render-pipelines:
+	@./scripts/render-pipelines.sh
 
 reset-storage:
 	@docker compose --profile pipeline down -v >/dev/null 2>&1 || true
 	rm -rf data/minio
+	rm -rf .generated
 
 flush-redis:
 	@echo "Flushing Redis Enterprise DB on localhost:$(REDIS_PORT)..."
@@ -121,7 +126,7 @@ topics:
 			/opt/kafka/bin/kafka-configs.sh \
 				--bootstrap-server korvet:9092 \
 				--entity-type topics --entity-name $$topic \
-				--alter --add-config "bucket.duration.ms=$(BUCKET_DURATION_MS),retention.ms=$(RETENTION_MS),local.retention.bytes=$(LOCAL_RETENTION_BYTES),remote.storage.enable=true"; \
+				--alter --add-config "retention.ms=$(RETENTION_MS),local.retention.bytes=$(LOCAL_RETENTION_BYTES),remote.storage.enable=true"; \
 		done; \
 		echo "Ensuring topic $(PROCESSED_TOPIC)..."; \
 		/opt/kafka/bin/kafka-topics.sh \
@@ -148,6 +153,20 @@ consume:
 		--from-beginning \
 		--max-messages 10 \
 		--timeout-ms 30000
+
+verify-cold-storage:
+	@COLD_ROOT="data/minio/korvet/delta"; \
+	if [ ! -d "$$COLD_ROOT" ]; then \
+		echo "Cold storage directory $$COLD_ROOT does not exist"; \
+		exit 1; \
+	fi; \
+	COUNT=$$(find "$$COLD_ROOT" -type f | wc -l | tr -d ' '); \
+	if [ "$$COUNT" -eq 0 ]; then \
+		echo "No cold-storage files found under $$COLD_ROOT"; \
+		exit 1; \
+	fi; \
+	echo "Found $$COUNT cold-storage files under $$COLD_ROOT"; \
+	find "$$COLD_ROOT" -type f | sed -n '1,10p'
 
 show-config:
 	@echo "Redis maxmemory bytes:    $(REDIS_MAXMEMORY_BYTES)"
