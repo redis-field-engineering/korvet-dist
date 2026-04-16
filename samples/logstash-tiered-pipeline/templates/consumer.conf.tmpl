@@ -1,13 +1,13 @@
 input {
   kafka {
     bootstrap_servers => "korvet:9092"
-    topics => ["logs-01"]
-    group_id => "logstash-consumer-logs-01"
-    client_id => "logstash-consumer-logs-01"
+    topics => ["__TOPIC__"]
+    group_id => "logstash-consumer-__TOPIC__"
+    client_id => "logstash-consumer-__TOPIC__"
     consumer_threads => 1
     codec => json
     decorate_events => "extended"
-    auto_offset_reset => "earliest"
+    auto_offset_reset => "${LOGSTASH_AUTO_OFFSET_RESET}"
   }
 }
 

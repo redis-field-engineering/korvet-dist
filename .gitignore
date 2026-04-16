@@ -38,6 +38,7 @@ hs_err_pid*
 
 # Docker
 .docker/
+samples/logstash-tiered-pipeline/.generated/
 
 # Logs
 *.log
@@ -47,4 +48,3 @@ logs/
 Thumbs.db
 .Spotlight-V100
 .Trashes
-

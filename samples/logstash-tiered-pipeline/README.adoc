@@ -16,7 +16,6 @@ Before Korvet starts, `make up` resets the S3 backend to an empty state by remov
 
 The 10 source topics are created or updated with these Korvet settings:
 
-* `bucket.duration.ms=60000` (1 minute)
 * `retention.ms=86400000` (1 day)
 * `local.retention.bytes=214748364` (80% of the default 256 MiB Redis budget)
 * `remote.storage.enable=true`

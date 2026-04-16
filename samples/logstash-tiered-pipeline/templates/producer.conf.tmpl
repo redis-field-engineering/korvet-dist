@@ -15,7 +15,7 @@ filter {
       hosts = (1..10).map { |i| "server-%02d" % i }
       paths = ["/api/v1/users", "/api/v1/orders", "/api/v1/products", "/health", "/metrics"]
       status_codes = [200, 201, 400, 401, 404, 500]
-      target_topic = "logs-01"
+      target_topic = "__TOPIC__"
 
       event.set("timestamp", Time.now.utc.iso8601(3))
       event.set("level", levels.sample)
