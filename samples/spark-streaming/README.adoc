@@ -383,11 +383,11 @@ lsof -i :9092  # Korvet Kafka
 
 **Solution:**
 
-The sample uses `redisfield/korvet` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
+The sample uses `redisfield/korvet:early-access` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet
+docker pull redisfield/korvet:early-access
 ----
 
 === No Data in Spark Streaming

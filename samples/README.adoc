@@ -164,7 +164,7 @@ All samples require:
 * Docker Compose 2.0+
 * At least 2GB available memory
 
-All samples use the official `redisfield/korvet` Docker image from Docker Hub - no build step required!
+All samples use the official `redisfield/korvet:early-access` Docker image from Docker Hub - no build step required!
 
 == Run the Sample
 
@@ -198,7 +198,7 @@ docker run -d -p 6379:6379 redis
 ----
 # Comment out the korvet service
 # korvet:
-#   image: redisfield/korvet
+#   image: redisfield/korvet:early-access
 #   ...
 
 # Update Filebeat to connect to host machine
@@ -274,11 +274,11 @@ docker-compose down -v
 
 === Korvet Image Not Found
 
-Docker will automatically pull `redisfield/korvet` on first run. If you see this error, try:
+Docker will automatically pull `redisfield/korvet:early-access` on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet
+docker pull redisfield/korvet:early-access
 ----
 
 === Port Already in Use

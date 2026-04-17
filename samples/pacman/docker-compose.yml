@@ -12,7 +12,7 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet
+    image: redisfield/korvet:early-access
     ports:
       - "9092:9092"
     environment:

@@ -29,7 +29,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: korvet
-          image: redisfield/korvet
+          image: redisfield/korvet:early-access
           ports:
             - containerPort: 9092
               name: kafka
@@ -74,4 +74,3 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
-

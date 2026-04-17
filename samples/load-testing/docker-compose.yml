@@ -8,7 +8,7 @@ services:
       - "6379:6379"
 
   korvet:
-    image: redisfield/korvet
+    image: redisfield/korvet:early-access
     ports:
       - "9092:9092"
     environment:

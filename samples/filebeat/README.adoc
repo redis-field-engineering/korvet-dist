@@ -272,11 +272,11 @@ make tail-logs       # Tail the generated log file
 
 === Korvet Image Not Found
 
-The sample uses `redisfield/korvet` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
+The sample uses `redisfield/korvet:early-access` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet
+docker pull redisfield/korvet:early-access
 ----
 
 === No Messages in Redis
@@ -382,4 +382,3 @@ output.kafka:
 * link:../README.adoc[All Samples]
 * https://www.elastic.co/guide/en/beats/filebeat/current/index.html[Filebeat Documentation]
 * https://www.elastic.co/guide/en/logstash/current/index.html[Logstash Documentation]
-
