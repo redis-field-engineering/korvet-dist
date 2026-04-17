@@ -30,7 +30,7 @@ cd samples/kafka-cli
 make up
 ----
 
-NOTE: Wait 10-15 seconds for services to initialize. Docker will automatically pull the `redisfield/korvet` image on first run.
+NOTE: Wait 10-15 seconds for services to initialize. Docker will automatically pull the `redisfield/korvet:early-access` image on first run.
 
 === 2. Interactive Demo
 
@@ -218,11 +218,11 @@ environment:
 
 *Korvet image not found?*
 
-Docker will automatically pull `redisfield/korvet` on first run. If you see this error, try:
+Docker will automatically pull `redisfield/korvet:early-access` on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet
+docker pull redisfield/korvet:early-access
 ----
 
 *Connection refused?*
@@ -276,4 +276,3 @@ Just point your client to `korvet:9092` instead of Kafka!
 * Try the link:../spark-streaming/README.adoc[Spark Streaming sample] for stream processing
 * Try the link:../pacman/README.adoc[Pac-Man game sample] for an interactive demo
 * Read the link:../../README.adoc[project documentation]
-
