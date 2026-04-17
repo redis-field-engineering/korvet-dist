@@ -12,8 +12,8 @@ services:
     ports:
       - "9092:9092"
     environment:
-      - KORVET_REDIS_HOST=redis
-      - KORVET_SERVER_ADVERTISED_HOST=korvet
+      - KORVET_REDIS_URI=redis://redis:6379
+      - KORVET_BROKER_ADVERTISED_HOST=korvet
       - KORVET_REDIS_METRICS_ENABLED=true
       - KORVET_REDIS_METRICS_HISTOGRAM=true
     depends_on:

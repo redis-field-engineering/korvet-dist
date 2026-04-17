@@ -6,8 +6,7 @@ services:
       - "8080:8080"
     environment:
       # Hot tier: Redis Enterprise Flex on host
-      - KORVET_REDIS_HOST=host.docker.internal
-      - KORVET_REDIS_PORT=12000
+      - KORVET_REDIS_URI=redis://host.docker.internal:12000
       # Cold tier: MinIO (S3-compatible)
       - KORVET_STORAGE_REMOTE_PATH=s3a://korvet/delta
       - KORVET_STORAGE_REMOTE_S3_ENDPOINT=http://minio:9000
@@ -16,11 +15,11 @@ services:
       - KORVET_STORAGE_REMOTE_S3_CREDENTIALS_ACCESS_KEY_ID=minioadmin
       - KORVET_STORAGE_REMOTE_S3_CREDENTIALS_SECRET_ACCESS_KEY=minioadmin
       # Archiver settings (run frequently for demo)
-      - KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL=5s
-      - KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE=100
+      - KORVET_ARCHIVER_INTERVAL=5s
+      - KORVET_ARCHIVER_BATCH_SIZE=100
       # Server settings
-      - KORVET_SERVER_ADVERTISED_HOST=korvet
-      - KORVET_SERVER_AUTO_CREATE_TOPICS=true
+      - KORVET_BROKER_ADVERTISED_HOST=korvet
+      - KORVET_TOPICS_AUTO_CREATE=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

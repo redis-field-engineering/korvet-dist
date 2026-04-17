@@ -68,7 +68,7 @@ docker run -d -p 6379:6379 redis
 
 # Run Korvet server
 docker run -d -p 9092:9092 -p 8080:8080 \
-  -e KORVET_REDIS_HOST=host.docker.internal \
+  -e KORVET_REDIS_URI=redis://host.docker.internal:6379 \
   redisfield/korvet
 ----
 
@@ -81,7 +81,7 @@ Basic configuration in `application.yml`:
 [source,yaml]
 ----
 korvet:
-  server:
+  broker:
     host: 0.0.0.0
     port: 9092
   redis:
