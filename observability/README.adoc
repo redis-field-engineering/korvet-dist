@@ -34,7 +34,7 @@ services:
       - "9092:9092"
       - "8080:8080"
     environment:
-      - KORVET_REDIS_HOST=redis
+      - KORVET_REDIS_URI=redis://redis:6379
       - KORVET_REDIS_METRICS_ENABLED=true
     depends_on:
       - redis

@@ -43,8 +43,7 @@ Korvet uses time-bucketed streams for efficient tiering:
 [source,yaml]
 ----
 # Hot tier: Redis Enterprise Flex
-KORVET_REDIS_HOST: host.docker.internal
-KORVET_REDIS_PORT: 12000
+KORVET_REDIS_URI: redis://host.docker.internal:12000
 
 # Cold tier: MinIO (S3-compatible)
 KORVET_STORAGE_REMOTE_PATH: s3a://korvet/delta
@@ -54,7 +53,7 @@ KORVET_STORAGE_REMOTE_S3_CREDENTIALS_ACCESS_KEY_ID: minioadmin
 KORVET_STORAGE_REMOTE_S3_CREDENTIALS_SECRET_ACCESS_KEY: minioadmin
 
 # Archiver settings
-KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: 5s
+KORVET_ARCHIVER_INTERVAL: 5s
 ----
 
 == Topic Configuration

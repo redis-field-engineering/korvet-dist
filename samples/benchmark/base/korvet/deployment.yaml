@@ -44,7 +44,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: KORVET_SERVER_ADVERTISED_HOST
+            - name: KORVET_BROKER_ADVERTISED_HOST
               value: "$(POD_IP)"
             - name: KORVET_REDIS_PASSWORD
               valueFrom:

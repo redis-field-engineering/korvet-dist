@@ -10,13 +10,13 @@ metadata:
   name: korvet-config
   namespace: korvet
 data:
-  # Server configuration
-  KORVET_SERVER_HOST: "0.0.0.0"
-  KORVET_SERVER_PORT: "9092"
-  KORVET_SERVER_BROKER_ID: "0"
-  KORVET_SERVER_KEYSPACE: "korvet"
-  KORVET_SERVER_ADVERTISED_HOST: "korvet.korvet.svc.cluster.local"
-  KORVET_SERVER_ADVERTISED_PORT: "9092"
+  # Broker configuration
+  KORVET_BROKER_HOST: "0.0.0.0"
+  KORVET_BROKER_PORT: "9092"
+  KORVET_BROKER_ID: "0"
+  KORVET_BROKER_KEYSPACE: "korvet"
+  KORVET_BROKER_ADVERTISED_HOST: "korvet.korvet.svc.cluster.local"
+  KORVET_BROKER_ADVERTISED_PORT: "9092"
 
   # Redis Enterprise connection (OSS Cluster API)
   KORVET_REDIS_URI: "redis://korvet-db.redis.svc.cluster.local:19750"
@@ -31,9 +31,9 @@ data:
   KORVET_STORAGE_REMOTE_S3_CREDENTIALS_TYPE: "IRSA"
 
   # Archiver configuration
-  KORVET_STORAGE_REMOTE_ARCHIVER_BATCH_SIZE: "10000"
-  KORVET_STORAGE_REMOTE_ARCHIVER_WORKERS: "4"
-  KORVET_STORAGE_REMOTE_ARCHIVER_INTERVAL: "PT1M"
+  KORVET_ARCHIVER_BATCH_SIZE: "10000"
+  KORVET_ARCHIVER_WORKERS: "4"
+  KORVET_ARCHIVER_INTERVAL: "PT1M"
 
   # Retention configuration
   KORVET_STORAGE_REMOTE_RETENTION_ENABLED: "true"
