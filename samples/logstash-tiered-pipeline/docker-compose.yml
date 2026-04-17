@@ -25,6 +25,7 @@ services:
 
   korvet:
     image: redisfield/korvet:early-access
+    pull_policy: always
     ports:
       - "9092:9092"
       - "8080:8080"
