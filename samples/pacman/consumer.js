@@ -11,6 +11,7 @@ const kafka = new Kafka({
   }
 });
 
+const admin = kafka.admin();
 const consumer = kafka.consumer({ 
   groupId: 'pacman-event-viewer',
   sessionTimeout: 30000,
@@ -18,6 +19,29 @@ const consumer = kafka.consumer({
 });
 
 const topics = ['USER_GAME', 'USER_LOSSES'];
+
+async function ensureTopicsExist() {
+  await admin.connect();
+
+  try {
+    const existingTopics = new Set(await admin.listTopics());
+    const missingTopics = topics.filter((topic) => !existingTopics.has(topic));
+
+    if (missingTopics.length === 0) {
+      return;
+    }
+
+    await admin.createTopics({
+      waitForLeaders: true,
+      topics: missingTopics.map((topic) => ({
+        topic,
+        numPartitions: 1,
+      })),
+    });
+  } finally {
+    await admin.disconnect();
+  }
+}
 
 async function run() {
   console.log(`
@@ -29,6 +53,7 @@ Connecting to Korvet at ${KAFKA_BROKER}...
   `);
 
   try {
+    await ensureTopicsExist();
     // Connect to Korvet
     await consumer.connect();
     console.log('✅ Connected to Korvet');
@@ -82,6 +107,7 @@ Connecting to Korvet at ${KAFKA_BROKER}...
 const shutdown = async () => {
   console.log('\n\nShutting down consumer...');
   try {
+    await admin.disconnect().catch(() => {});
     await consumer.disconnect();
     console.log('✅ Disconnected from Korvet');
     process.exit(0);
@@ -96,4 +122,3 @@ process.on('SIGINT', shutdown);
 
 // Run the consumer
 run().catch(console.error);
-
