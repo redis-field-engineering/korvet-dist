@@ -18,7 +18,7 @@ services:
       - "9092:9092"
     environment:
       KORVET_REDIS_URI: redis://redis:6379
-      KORVET_BROKER_ADVERTISED_HOST: ${KORVET_ADVERTISED_HOST:-korvet}
+      KORVET_BROKER_ADVERTISED_HOST: ${KORVET_BROKER_ADVERTISED_HOST:-korvet}
       KORVET_TOPICS_AUTO_CREATE: "true"
     depends_on:
       redis:
