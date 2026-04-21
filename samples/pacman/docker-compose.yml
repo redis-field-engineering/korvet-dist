@@ -18,7 +18,7 @@ services:
       - "9092:9092"
     environment:
       KORVET_REDIS_URI: redis://redis:6379
-      KORVET_BROKER_ADVERTISED_HOST: korvet
+      KORVET_BROKER_ADVERTISED_HOST: ${KORVET_BROKER_ADVERTISED_HOST:-korvet}
       KORVET_TOPICS_AUTO_CREATE: "true"
     depends_on:
       redis:
@@ -39,7 +39,7 @@ services:
       - "3000:3000"
     command: sh -c "npm install && npm run server"
     environment:
-      KAFKA_BROKER: korvet:9092
+      KAFKA_BROKER: ${KAFKA_BROKER:-korvet:9092}
     depends_on:
       korvet:
         condition: service_healthy
@@ -57,9 +57,31 @@ services:
       - ./:/app
     command: sh -c "npm install && npm run consumer"
     environment:
-      KAFKA_BROKER: korvet:9092
+      KAFKA_BROKER: ${KAFKA_BROKER:-korvet:9092}
     depends_on:
       korvet:
         condition: service_healthy
       web:
+        condition: service_healthy
+
+  # Kafka UI - Browser-based topic explorer for Korvet
+  kafka-ui:
+    image: kafbat/kafka-ui:latest
+    ports:
+      - "8081:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      KAFKA_CLUSTERS_0_NAME: korvet
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_BROKER:-korvet:9092}
+    depends_on:
+      korvet:
+        condition: service_healthy
+
+  # RedisInsight - Browser UI for inspecting Korvet's backing Redis streams
+  redisinsight:
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
         condition: service_healthy

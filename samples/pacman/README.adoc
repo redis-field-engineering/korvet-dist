@@ -67,6 +67,8 @@ That's it! Docker Compose will:
 
 * ✅ Pull the official `redisfield/korvet:early-access` image from Docker Hub
 * ✅ Start Redis, Korvet, web server, and consumer
+* ✅ Start Kafka UI for browser-based topic inspection
+* ✅ Start RedisInsight for direct stream inspection
 * ✅ Install Node.js dependencies automatically
 * ✅ Make everything available in ~30 seconds
 
@@ -92,6 +94,31 @@ You'll see:
 🎮 USER_GAME: {"user":"player456","game":{"score":250,"lives":2,"level":2}}
 ----
 
+=== Browse Topics In The UI
+
+Open http://localhost:8081 to inspect topics, messages, and consumer groups in your browser.
+
+This Kafka UI service runs inside Docker and connects to Korvet over `korvet:9092`.
+
+NOTE: Topic and cluster metadata work reliably here. If message browsing shows fetch errors, use RedisInsight below to inspect the underlying Redis streams directly.
+
+=== Browse Messages In RedisInsight
+
+Open http://localhost:5540 for a reliable browser view of Korvet's backing Redis data.
+
+In RedisInsight, connect to:
+
+[source,text]
+----
+Host: redis
+Port: 6379
+----
+
+Korvet stores topic data in Redis Streams such as:
+
+* `default:USER_GAME:0`
+* `default:USER_LOSSES:0`
+
 === Useful Commands
 
 [source,bash]
@@ -99,6 +126,8 @@ You'll see:
 docker compose ps              # Check service status
 docker compose logs -f web     # View web server logs
 docker compose logs -f korvet  # View Korvet logs
+docker compose logs -f kafka-ui # View Kafka UI logs
+docker compose logs -f redisinsight # View RedisInsight logs
 docker compose down            # Stop all services
 ----
 
@@ -126,7 +155,7 @@ docker compose down            # Stop all services
 
 **Client Connection:**
 
-* kafkajs connects to `localhost:9092`
+* The sample uses the Docker-network broker address: `korvet:9092`
 * Korvet accepts connection using Kafka wire protocol
 * Client thinks it's talking to Kafka
 
