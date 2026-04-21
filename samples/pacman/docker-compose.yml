@@ -19,6 +19,7 @@ services:
     environment:
       KORVET_REDIS_URI: redis://redis:6379
       KORVET_BROKER_ADVERTISED_HOST: korvet
+      KORVET_TOPICS_AUTO_CREATE: "true"
     depends_on:
       redis:
         condition: service_healthy
@@ -42,6 +43,11 @@ services:
     depends_on:
       korvet:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep '\"korvet\":\"connected\"' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   # Consumer - Processes game events from Kafka
   consumer:
@@ -54,4 +60,6 @@ services:
       KAFKA_BROKER: korvet:9092
     depends_on:
       korvet:
+        condition: service_healthy
+      web:
         condition: service_healthy

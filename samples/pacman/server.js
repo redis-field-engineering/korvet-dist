@@ -18,6 +18,8 @@ const kafka = new Kafka({
 });
 
 const producer = kafka.producer();
+const admin = kafka.admin();
+const topics = ['USER_GAME', 'USER_LOSSES'];
 
 // Middleware
 app.use(cors());
@@ -27,8 +29,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Initialize Kafka producer
 let producerReady = false;
 
+async function ensureTopicsExist() {
+  await admin.connect();
+
+  try {
+    const existingTopics = new Set(await admin.listTopics());
+    const missingTopics = topics.filter((topic) => !existingTopics.has(topic));
+
+    if (missingTopics.length === 0) {
+      return;
+    }
+
+    await admin.createTopics({
+      waitForLeaders: true,
+      topics: missingTopics.map((topic) => ({
+        topic,
+        numPartitions: 1,
+      })),
+    });
+  } finally {
+    await admin.disconnect();
+  }
+}
+
 async function initProducer() {
   try {
+    await ensureTopicsExist();
     await producer.connect();
     producerReady = true;
     console.log('✅ Connected to Korvet (Kafka producer ready)');
@@ -104,12 +130,14 @@ app.get('/', (req, res) => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('Shutting down gracefully...');
+  await admin.disconnect().catch(() => {});
   await producer.disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('\nShutting down gracefully...');
+  await admin.disconnect().catch(() => {});
   await producer.disconnect();
   process.exit(0);
 });
