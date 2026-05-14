@@ -5,13 +5,6 @@ metadata:
 data:
   # Redis connection - Docker Redis Enterprise on host
   KORVET_REDIS_URI: "redis://host.docker.internal:12000"
-  KORVET_REDIS_CLUSTER: "false"
-
-  # Broker and topic configuration
-  KORVET_BROKER_WORKER_THREADS: "0"
-  KORVET_BROKER_BOSS_THREADS: "1"
-  KORVET_TOPICS_DEFAULTS_PARTITIONS: "1"
-  KORVET_TOPICS_DEFAULTS_COMPRESSION: "none"
 
   # Metrics
   KORVET_REDIS_METRICS_ENABLED: "true"

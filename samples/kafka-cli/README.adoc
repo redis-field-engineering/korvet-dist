@@ -210,7 +210,8 @@ By default, Korvet expects *JSON messages*. You have two options:
 [source,yaml]
 ----
 environment:
-  KORVET_MESSAGE_FORMAT_DEFAULT: RAW
+  KORVET_TOPICS_0_NAME: "*"
+  KORVET_TOPICS_0_VALUE_TYPE: RAW
 ----
 ====
 
