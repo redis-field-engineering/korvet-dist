@@ -11,12 +11,7 @@ metadata:
   namespace: korvet
 data:
   # Broker configuration
-  KORVET_BROKER_HOST: "0.0.0.0"
-  KORVET_BROKER_PORT: "9092"
-  KORVET_BROKER_ID: "0"
-  KORVET_BROKER_KEYSPACE: "korvet"
   KORVET_BROKER_ADVERTISED_HOST: "korvet.korvet.svc.cluster.local"
-  KORVET_BROKER_ADVERTISED_PORT: "9092"
 
   # Redis Enterprise connection (OSS Cluster API)
   KORVET_REDIS_URI: "redis://korvet-db.redis.svc.cluster.local:19750"
@@ -32,9 +27,8 @@ data:
 
   # Archiver configuration
   KORVET_ARCHIVER_BATCH_SIZE: "10000"
-  KORVET_ARCHIVER_WORKERS: "4"
-  KORVET_ARCHIVER_INTERVAL: "PT1M"
+  KORVET_ARCHIVER_MAX_CONCURRENT_STREAMS: "4"
+  KORVET_ARCHIVER_SCAN_INTERVAL: "PT1M"
 
-  # Retention configuration
-  KORVET_STORAGE_REMOTE_RETENTION_ENABLED: "true"
-  KORVET_STORAGE_REMOTE_RETENTION_INTERVAL: "PT1H"
+  # Trimmer configuration
+  KORVET_TRIMMER_SCAN_INTERVAL: "PT1H"
