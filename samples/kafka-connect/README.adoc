@@ -1,4 +1,4 @@
-= Kafka Connect File Sink Sample
+= Kafka Connect Sample
 :toc:
 :icons: font
 
@@ -47,7 +47,7 @@ Host ports are mapped to `19092` for Korvet, `18080` for Korvet HTTP, and `16379
 +
 [source,bash]
 ----
-cd samples/kafka-connect-file-sink
+cd samples/kafka-connect
 make up
 ----
 

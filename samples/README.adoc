@@ -128,7 +128,7 @@ cd filebeat
 docker compose up -d
 ----
 
-=== link:kafka-connect-file-sink/README.adoc[Kafka Connect File Sink Sample]
+=== link:kafka-connect/README.adoc[Kafka Connect Sample]
 
 Demonstrates Kafka Connect consuming from Korvet and writing each Kafka record value to a local JSON lines file.
 
@@ -150,7 +150,7 @@ Demonstrates Kafka Connect consuming from Korvet and writing each Kafka record v
 
 [source,bash]
 ----
-cd kafka-connect-file-sink
+cd kafka-connect
 make up
 make tail-output
 ----

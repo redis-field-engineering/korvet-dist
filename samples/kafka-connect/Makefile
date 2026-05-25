@@ -3,7 +3,7 @@
 TOPIC ?= dw-scte
 
 help:
-	@echo "Korvet Kafka Connect File Sink Sample"
+	@echo "Korvet Kafka Connect Sample"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make up             - Build the Connect image and start all services"
