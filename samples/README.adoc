@@ -128,6 +128,33 @@ cd filebeat
 docker compose up -d
 ----
 
+=== link:kafka-connect-file-sink/README.adoc[Kafka Connect File Sink Sample]
+
+Demonstrates Kafka Connect consuming from Korvet and writing each Kafka record value to a local JSON lines file.
+
+**Includes:**
+
+* Redis backend storage for Korvet
+* Korvet server with Kafka protocol
+* Kafka Connect standalone worker
+* Kafka's built-in file sink connector
+* Automated JSON event producer
+
+**Use Cases:**
+
+* Validating Kafka Connect compatibility
+* Local sink testing without external credentials or services
+* Local demos of Kafka Connect sink connector behavior
+
+**Quick Start:**
+
+[source,bash]
+----
+cd kafka-connect-file-sink
+make up
+make tail-output
+----
+
 === link:logstash-tiered-pipeline/README.adoc[Logstash Tiered Pipeline]
 
 End-to-end local pipeline using Docker Compose with Redis, Korvet, and two Logstash instances.

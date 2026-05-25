@@ -1,0 +1,126 @@
+= Kafka Connect File Sink Sample
+:toc:
+:icons: font
+
+== Overview
+
+This sample demonstrates Korvet working with Kafka Connect in standalone mode using Kafka's built-in `FileStreamSinkConnector`.
+An event producer writes JSON events to Korvet through the Kafka protocol, and Kafka Connect consumes the `dw-scte` topic and writes each record value to a local JSON lines file.
+
+This is a local smoke test for the Kafka Connect path. It does not require Google Cloud credentials or any external Pub/Sub service.
+
+*What it demonstrates:*
+
+* Korvet as the Kafka-compatible broker for Kafka Connect
+* A JSON event producer writing to the `dw-scte` topic
+* Kafka's built-in `org.apache.kafka.connect.file.FileStreamSinkConnector`
+* Kafka records written to `output/dw-scte.jsonl`
+
+Host ports are mapped to `19092` for Korvet, `18080` for Korvet HTTP, and `16379` for Korvet Redis to avoid common local development port conflicts.
+
+== Architecture
+
+[source,text]
+----
++----------------+
+| Event Producer |
++-------+--------+
+        | Kafka protocol
+        v
++----------------+       Redis Streams       +--------------+
+|     Korvet     |-------------------------->| Korvet Redis |
++-------+--------+                           +--------------+
+        | Kafka consumer protocol
+        v
++--------------------+       append       +------------------+
+| Kafka Connect Sink |------------------->| output JSONL     |
++--------------------+                    +------------------+
+----
+
+== Prerequisites
+
+* Docker and Docker Compose
+
+== Quick Start
+
+. Start the stack:
++
+[source,bash]
+----
+cd samples/kafka-connect-file-sink
+make up
+----
+
+. Tail the sink output in another terminal:
++
+[source,bash]
+----
+make tail-output
+----
+
+. Produce a one-off manual event:
++
+[source,bash]
+----
+make produce-once
+----
+
+. Stop the stack:
++
+[source,bash]
+----
+make down
+----
+
+== Kafka Connect Configuration
+
+The standalone worker configuration is:
+
+[source,properties]
+----
+bootstrap.servers=korvet:9092
+plugin.path=/opt/kafka/libs
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+key.converter.schemas.enable=false
+value.converter.schemas.enable=false
+offset.storage.file.filename=/tmp/connect.offsets
+offset.flush.interval.ms=10000
+----
+
+The sink connector configuration is:
+
+[source,properties]
+----
+name=file-sink
+connector.class=org.apache.kafka.connect.file.FileStreamSinkConnector
+tasks.max=1
+topics=dw-scte
+file=/tmp/korvet-connect-output/dw-scte.jsonl
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+consumer.auto.offset.reset=latest
+----
+
+== Files
+
+* `docker-compose.yml` - Korvet, Redis 8, Kafka Connect, Kafka tools, and an event producer
+* `connect-standalone.properties` - Kafka Connect worker configuration
+* `file-sink.properties` - File sink connector configuration
+* `producer.sh` - Simple JSON event producer used by Docker Compose
+* `output/dw-scte.jsonl` - Local sink output, created when the sample runs
+* `Makefile` - Demo commands
+
+== Makefile Commands
+
+[source,bash]
+----
+make up             # Start all services
+make logs-connect   # Follow Kafka Connect logs
+make tail-output    # Tail output/dw-scte.jsonl
+make show-output    # Show the last records written by Kafka Connect
+make produce-once   # Produce one JSON event to Kafka topic dw-scte
+make consume-kafka  # Consume events directly from Korvet/Kafka
+make topics         # List Kafka topics
+make clean          # Stop services and remove output
+----

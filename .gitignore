@@ -39,6 +39,7 @@ hs_err_pid*
 # Docker
 .docker/
 samples/logstash-tiered-pipeline/.generated/
+samples/kafka-connect-file-sink/output/
 
 # Logs
 *.log

@@ -1,0 +1,56 @@
+services:
+  # Redis - Backend storage for Korvet.
+  korvet-redis:
+    image: redis:8
+    ports:
+      - "16379:6379"
+
+  # Korvet Server - Kafka-compatible streaming service
+  korvet:
+    image: redisfield/korvet:early-access
+    pull_policy: always
+    ports:
+      - "19092:9092"
+      - "18080:8080"
+    environment:
+      KORVET_REDIS_URI: redis://korvet-redis:6379
+      KORVET_BROKER_ADVERTISED_HOST: korvet
+      KORVET_TOPICS_0_NAME: "*"
+      KORVET_TOPICS_0_AUTO_CREATE: "true"
+      KORVET_TOPICS_0_PARTITIONS: "1"
+    depends_on:
+      - korvet-redis
+
+  # Kafka CLI Tools - Used by Makefile commands and topic initialization
+  kafka-tools:
+    image: apache/kafka
+    command: sleep infinity
+    depends_on:
+      - korvet
+
+  # Kafka Connect standalone worker with Kafka's built-in file sink connector
+  kafka-connect:
+    image: apache/kafka:3.7.0
+    volumes:
+      - ./connect-standalone.properties:/opt/kafka/config/connect-standalone.properties:ro
+      - ./file-sink.properties:/opt/kafka/config/file-sink.properties:ro
+      - ./output:/tmp/korvet-connect-output
+    command:
+      - /opt/kafka/bin/connect-standalone.sh
+      - /opt/kafka/config/connect-standalone.properties
+      - /opt/kafka/config/file-sink.properties
+    depends_on:
+      - korvet
+
+  # Event Producer - Emits JSON events to Korvet through the Kafka protocol
+  event-producer:
+    image: apache/kafka
+    volumes:
+      - ./producer.sh:/opt/korvet/producer.sh:ro
+    depends_on:
+      - korvet
+    environment:
+      TOPIC: dw-scte
+    command:
+      - /bin/sh
+      - /opt/korvet/producer.sh
