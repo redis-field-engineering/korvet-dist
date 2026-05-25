@@ -86,6 +86,7 @@ key.converter.schemas.enable=false
 value.converter.schemas.enable=false
 offset.storage.file.filename=/tmp/connect.offsets
 offset.flush.interval.ms=10000
+connector.client.config.override.policy=All
 ----
 
 The sink connector configuration is:
@@ -99,7 +100,7 @@ topics=dw-scte
 file=/tmp/korvet-connect-output/dw-scte.jsonl
 key.converter=org.apache.kafka.connect.storage.StringConverter
 value.converter=org.apache.kafka.connect.storage.StringConverter
-consumer.auto.offset.reset=latest
+consumer.override.auto.offset.reset=latest
 ----
 
 == Files
