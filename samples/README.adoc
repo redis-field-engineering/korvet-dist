@@ -162,7 +162,7 @@ End-to-end local pipeline using Docker Compose with Redis, Korvet, and two Logst
 **Includes:**
 
 * `redis:latest` for hot-tier storage
-* `redisfield/korvet:early-access` for Kafka-compatible streaming
+* `redisfield/korvet:latest` for Kafka-compatible streaming
 * Logstash producer generating synthetic logs into `logs`
 * Logstash consumer enriching events into `logs-processed`
 * Topic recreation with tiered-storage settings matching `eks-pipeline`
@@ -191,7 +191,7 @@ All samples require:
 * Docker Compose 2.0+
 * At least 2GB available memory
 
-All samples use the official `redisfield/korvet:early-access` Docker image from Docker Hub - no build step required!
+All samples use the official `redisfield/korvet:latest` Docker image from Docker Hub - no build step required!
 
 == Run the Sample
 
@@ -225,7 +225,7 @@ docker run -d -p 6379:6379 redis
 ----
 # Comment out the korvet service
 # korvet:
-#   image: redisfield/korvet:early-access
+#   image: redisfield/korvet:latest
 #   ...
 
 # Update Filebeat to connect to host machine
@@ -301,11 +301,11 @@ docker-compose down -v
 
 === Korvet Image Not Found
 
-Docker will automatically pull `redisfield/korvet:early-access` on first run. If you see this error, try:
+Docker will automatically pull `redisfield/korvet:latest` on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet:early-access
+docker pull redisfield/korvet:latest
 ----
 
 === Port Already in Use

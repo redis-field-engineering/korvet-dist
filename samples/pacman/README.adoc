@@ -65,7 +65,7 @@ docker compose up -d
 
 That's it! Docker Compose will:
 
-* ✅ Pull the official `redisfield/korvet:early-access` image from Docker Hub
+* ✅ Pull the official `redisfield/korvet:latest` image from Docker Hub
 * ✅ Start Redis, Korvet, web server, and consumer
 * ✅ Start Kafka UI for browser-based topic inspection
 * ✅ Start RedisInsight for direct stream inspection

@@ -30,7 +30,7 @@ cd samples/kafka-cli
 make up
 ----
 
-NOTE: Wait 10-15 seconds for services to initialize. Docker will automatically pull the `redisfield/korvet:early-access` image on first run.
+NOTE: Wait 10-15 seconds for services to initialize. Docker will automatically pull the `redisfield/korvet:latest` image on first run.
 
 === 2. Interactive Demo
 
@@ -212,11 +212,11 @@ Plain strings such as `Hello` are equally valid.
 
 *Korvet image not found?*
 
-Docker will automatically pull `redisfield/korvet:early-access` on first run. If you see this error, try:
+Docker will automatically pull `redisfield/korvet:latest` on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet:early-access
+docker pull redisfield/korvet:latest
 ----
 
 *Connection refused?*

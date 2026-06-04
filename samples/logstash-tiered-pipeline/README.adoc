@@ -8,7 +8,7 @@ This sample runs a local end-to-end Korvet pipeline with Docker Compose:
 
 * Redis Enterprise DB on `localhost:12000` as the hot tier backend
 * `minio/minio` as an S3-compatible cold storage backend
-* `redisfield/korvet:early-access` with tiered storage enabled against S3
+* `redisfield/korvet:latest` with tiered storage enabled against S3
 * One Logstash producer container with ten pipelines, each generating synthetic log events into one of `logs-01` through `logs-10`
 * One Logstash consumer container with ten pipelines, each reading one source topic, enriching events, and writing to `logs-processed`
 
@@ -59,7 +59,7 @@ Korvet writes archived topic data to MinIO using static credentials configured i
 
 == Korvet Tuning
 
-With the current `redisfield/korvet:early-access` image, the Logstash consumer can stall under the full 40-partition subscription unless Korvet is given more headroom for Redis connections, server backpressure, and storage-worker cadence.
+Under the full 40-partition subscription, the Logstash consumer can stall unless Korvet is given more headroom for Redis connections, server backpressure, and storage-worker cadence.
 
 When that happens, the usual symptoms are:
 

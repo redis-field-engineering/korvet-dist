@@ -322,5 +322,5 @@ kubectl exec deployment/korvet -n korvet -- aws sts get-caller-identity
 Check that:
 
 1. Topic has `segment.ms` set (the server default may be too long for testing)
-2. Korvet is using `early-access` image (tiered storage fully supported)
+2. Korvet image includes tiered storage (`redisfield/korvet:latest` or newer)
 3. Enough time has passed for a segment to seal and be offloaded

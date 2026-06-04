@@ -1,6 +1,6 @@
 services:
   korvet:
-    image: redisfield/korvet:early-access
+    image: redisfield/korvet:latest
     pull_policy: always
     ports:
       - "9092:9092"

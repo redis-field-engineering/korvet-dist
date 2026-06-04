@@ -272,11 +272,11 @@ make tail-logs       # Tail the generated log file
 
 === Korvet Image Not Found
 
-The sample uses `redisfield/korvet:early-access` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
+The sample uses `redisfield/korvet:latest` from Docker Hub. Docker will automatically pull it on first run. If you see this error, try:
 
 [source,bash]
 ----
-docker pull redisfield/korvet:early-access
+docker pull redisfield/korvet:latest
 ----
 
 === No Messages in Redis
