@@ -17,7 +17,6 @@ services:
       KORVET_BROKER_ADVERTISED_HOST: korvet
       KORVET_TOPICS_0_NAME: "*"
       KORVET_TOPICS_0_AUTO_CREATE: "true"
-      KORVET_TOPICS_0_PARTITIONS: "1"
     depends_on:
       - korvet-redis
 

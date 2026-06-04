@@ -87,10 +87,10 @@ redis-stats:
 	@docker-compose exec -T redis redis-cli INFO stats | grep -E "total_commands_processed|total_connections_received|instantaneous_ops_per_sec"
 	@echo ""
 	@echo "Topic Keys:"
-	@docker-compose exec -T redis redis-cli KEYS "default:*"
+	@docker-compose exec -T redis redis-cli KEYS "korvet:storage:local:*"
 	@echo ""
 	@echo "Message Count (partition 0):"
-	@docker-compose exec -T redis redis-cli XLEN "default:filebeat-logs:0" 2>/dev/null || echo "0"
+	@docker-compose exec -T redis redis-cli XLEN "korvet:storage:local:filebeat-logs:0" 2>/dev/null || echo "0"
 
 # Tail the generated log file
 tail-logs:

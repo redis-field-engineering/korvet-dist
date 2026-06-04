@@ -64,9 +64,9 @@ consumer:
 redis-cli:
 	@echo "Connecting to Redis..."
 	@echo "Try these commands:"
-	@echo "  KEYS \"default:*\""
-	@echo "  XLEN \"default:demo-topic:0\""
-	@echo "  XRANGE \"default:demo-topic:0\" - + COUNT 10"
+	@echo "  KEYS \"korvet:storage:local:*\""
+	@echo "  XLEN \"korvet:storage:local:demo-topic:0\""
+	@echo "  XRANGE \"korvet:storage:local:demo-topic:0\" - + COUNT 10"
 	@echo ""
 	docker compose exec redis redis-cli
 

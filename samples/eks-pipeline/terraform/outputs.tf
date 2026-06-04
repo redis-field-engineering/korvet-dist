@@ -32,9 +32,9 @@ output "configure_kubectl" {
   value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}"
 }
 
-output "s3_delta_path" {
-  description = "S3 path for Korvet Delta Lake storage"
-  value       = "s3a://${aws_s3_bucket.korvet_data.id}/korvet/delta"
+output "s3_cold_path" {
+  description = "S3 path for Korvet's remote (cold) tier Apache Iceberg table"
+  value       = "s3://${aws_s3_bucket.korvet_data.id}/korvet"
 }
 
 output "s3_spark_output_path" {

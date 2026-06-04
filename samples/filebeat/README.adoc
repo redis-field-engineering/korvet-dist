@@ -100,10 +100,10 @@ docker-compose exec redis redis-cli
 make redis-cli
 
 # Inside Redis CLI:
-KEYS "default:*"                              # List all topics
-XLEN "default:filebeat-logs:0"                # Count messages
-XRANGE "default:filebeat-logs:0" - + COUNT 10 # Read first 10 messages
-XINFO GROUPS "default:filebeat-logs:0"        # Check consumer groups
+KEYS "korvet:storage:local:*"                              # List all topics
+XLEN "korvet:storage:local:filebeat-logs:0"                # Count messages
+XRANGE "korvet:storage:local:filebeat-logs:0" - + COUNT 10 # Read first 10 messages
+XINFO GROUPS "korvet:storage:local:filebeat-logs:0"        # Check consumer groups
 ----
 
 . View Logstash processed output:
@@ -142,7 +142,7 @@ This demo shows a complete streaming data pipeline:
 . **Log Generator** creates sample JSON logs every 2 seconds in `/logs/app.log`
 . **Filebeat** (Producer) monitors the log file and ships new entries to Korvet via Kafka protocol
 . **Korvet** (Broker) receives the Kafka Produce requests and stores messages in Redis Streams
-. **Redis** (Storage) stores the messages in a stream with key `default:filebeat-logs:0`
+. **Redis** (Storage) stores the messages in a stream with key `korvet:storage:local:filebeat-logs:0`
 . **Logstash** (Consumer) reads messages from Korvet using Kafka consumer protocol
 . **Logstash** processes the messages:
    - Adds metadata (`processed_by`, `processed_at`, `pipeline`)
@@ -307,7 +307,7 @@ docker-compose exec filebeat filebeat test output
 docker-compose logs logstash | grep -i "kafka\|consumer"
 
 # Verify consumer group exists
-docker-compose exec redis redis-cli XINFO GROUPS "default:filebeat-logs:0"
+docker-compose exec redis redis-cli XINFO GROUPS "korvet:storage:local:filebeat-logs:0"
 
 # Check output files
 docker-compose exec logstash ls -la /output/

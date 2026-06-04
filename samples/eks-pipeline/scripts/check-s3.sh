@@ -22,8 +22,10 @@ echo ">>> Contents:"
 aws s3 ls "s3://$S3_BUCKET/" --recursive --human-readable --summarize
 
 echo ""
-echo ">>> By Partition:"
-for i in 0 1 2 3; do
-  COUNT=$(aws s3 ls "s3://$S3_BUCKET/korvet/delta/korvet/stream/logs/$i/" --recursive 2>/dev/null | wc -l | tr -d ' ')
-  echo "  logs/$i: $COUNT files"
-done
+echo ">>> Iceberg table (remote tier):"
+# The remote tier is a single Apache Iceberg table under s3://$S3_BUCKET/korvet:
+# a metadata/ directory plus Parquet data files (segment-*.parquet).
+DATA_FILES=$(aws s3 ls "s3://$S3_BUCKET/korvet/" --recursive 2>/dev/null | grep -c '\.parquet$')
+META_FILES=$(aws s3 ls "s3://$S3_BUCKET/korvet/metadata/" --recursive 2>/dev/null | wc -l | tr -d ' ')
+echo "  Parquet data files: $DATA_FILES"
+echo "  Metadata files:     $META_FILES"

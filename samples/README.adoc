@@ -266,13 +266,13 @@ docker-compose logs -f filebeat
 docker-compose exec redis redis-cli
 
 # List all topics (keys)
-KEYS "default:*"
+KEYS "korvet:storage:local:*"
 
 # Check message count
-XLEN "default:filebeat-logs:0"
+XLEN "korvet:storage:local:filebeat-logs:0"
 
 # Read messages
-XRANGE "default:filebeat-logs:0" - + COUNT 10
+XRANGE "korvet:storage:local:filebeat-logs:0" - + COUNT 10
 ----
 
 === Restart Services

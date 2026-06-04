@@ -6,11 +6,11 @@
 
 This sample demonstrates Korvet's tiered storage feature with:
 
-* **Hot tier**: Redis Enterprise Flex database on `localhost:12000`
-* **Cold tier**: MinIO (S3-compatible local storage) with Delta Lake format
-* **Bucket duration**: 10 seconds (fast rotation for demo purposes)
+* **Local (hot) tier**: Redis Enterprise Flex database on `localhost:12000`
+* **Remote (cold) tier**: an Apache Iceberg table on MinIO (S3-compatible local storage)
+* **Segment duration**: 10 seconds (fast rollover for demo purposes)
 
-Data flows from hot tier to cold tier as buckets age out, enabling cost-effective storage while maintaining Kafka API compatibility.
+Data flows from the local tier to the remote tier as segments are sealed and offloaded, enabling cost-effective storage while maintaining Kafka API compatibility.
 
 == Prerequisites
 
@@ -29,36 +29,36 @@ make down         # Stop services
 
 == How It Works
 
-=== Time-Bucketed Streams
+=== Segments and the Storage Worker
 
-Korvet uses time-bucketed streams for efficient tiering:
+Korvet rolls each partition's Redis stream into segments and offloads sealed segments to the remote tier:
 
-1. Messages are written to Redis streams with time-based bucket keys
-2. When a bucket's duration expires (10s in this demo), it becomes eligible for archival
-3. The archiver moves completed buckets to cold storage (Delta Lake on MinIO)
+1. Messages are appended to a partition's local Redis stream
+2. When a segment reaches its `segment.ms`/`segment.bytes` threshold (10s in this demo) it is sealed
+3. The leader-locked storage worker streams sealed segments into the Apache Iceberg table on MinIO, then trims the local tier per the retention settings
 4. Reads span both tiers transparently
 
 === Configuration
 
 [source,yaml]
 ----
-# Hot tier: Redis Enterprise Flex
+# Local (hot) tier: Redis Enterprise Flex
 KORVET_REDIS_URI: redis://host.docker.internal:12000
 
-# Cold tier: MinIO (S3-compatible)
-KORVET_STORAGE_REMOTE_PATH: s3a://korvet/delta
+# Remote (cold) tier: Apache Iceberg table on MinIO (S3-compatible)
+KORVET_STORAGE_REMOTE_PATH: s3://korvet/cold
 KORVET_STORAGE_REMOTE_S3_ENDPOINT: http://minio:9000
-KORVET_STORAGE_REMOTE_S3_CREDENTIALS_TYPE: static
-KORVET_STORAGE_REMOTE_S3_CREDENTIALS_ACCESS_KEY_ID: minioadmin
-KORVET_STORAGE_REMOTE_S3_CREDENTIALS_SECRET_ACCESS_KEY: minioadmin
+KORVET_STORAGE_REMOTE_S3_PATH_STYLE_ACCESS: "true"
+KORVET_STORAGE_REMOTE_S3_ACCESS_KEY_ID: minioadmin
+KORVET_STORAGE_REMOTE_S3_SECRET_ACCESS_KEY: minioadmin
 
-# Archiver settings
-KORVET_ARCHIVER_SCAN_INTERVAL: 5s
+# Storage worker tick cadence
+KORVET_STORAGE_WORKER_TICK_INTERVAL: 5s
 ----
 
 == Topic Configuration
 
-Topics must have `remote.storage.enable=true` to be archived:
+Topics must have `remote.storage.enable=true` to be offloaded to the remote tier:
 
 [source,bash]
 ----
@@ -68,10 +68,10 @@ kafka-topics --bootstrap-server localhost:9092 \
   --config remote.storage.enable=true \
   --config local.retention.ms=15000
 
-# Set bucket duration (Korvet extension)
+# Set segment duration so segments seal quickly
 kafka-configs --bootstrap-server localhost:9092 \
   --entity-type topics --entity-name my-topic \
-  --alter --add-config bucket.duration.ms=10000
+  --alter --add-config segment.ms=10000
 ----
 
 == Monitoring
@@ -86,15 +86,19 @@ Access MinIO at http://localhost:9001 (credentials: minioadmin/minioadmin)
 ----
 make redis-cli
 
-# List stream buckets
-KEYS korvet:stream:*
+# List local-tier stream segments
+KEYS korvet:storage:local:*
 ----
 
 === Korvet Metrics
 
 [source,bash]
 ----
-curl http://localhost:8080/actuator/metrics/korvet.archiver.records.archived
+# Storage worker liveness (1 when this instance holds the leader lock)
+curl http://localhost:8080/actuator/metrics/korvet.storage.worker.up
+
+# Messages written to the remote tier
+curl 'http://localhost:8080/actuator/metrics/korvet.storage.write.messages?tag=tier:remote'
 ----
 
 == Cleanup

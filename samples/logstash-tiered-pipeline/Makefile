@@ -155,7 +155,7 @@ consume:
 		--timeout-ms 30000
 
 verify-cold-storage:
-	@COLD_ROOT="data/minio/korvet/delta"; \
+	@COLD_ROOT="data/minio/korvet/cold"; \
 	if [ ! -d "$$COLD_ROOT" ]; then \
 		echo "Cold storage directory $$COLD_ROOT does not exist"; \
 		exit 1; \

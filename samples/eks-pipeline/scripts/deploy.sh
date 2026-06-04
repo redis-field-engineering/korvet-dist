@@ -103,13 +103,13 @@ kubectl exec kafka-cli -n korvet -- kafka-topics \
   --create --topic logs --partitions 4 2>/dev/null || echo "Topic already exists"
 
 # Configure tiered storage settings:
-# - bucket.duration.ms=300000 (5 min) - how often buckets are sealed and archived
-# - retention.ms=1800000 (30 min) - TTL for data in Redis (buckets expire after this + bucket duration)
-# - remote.storage.enable=true - enable archival to S3
+# - segment.ms=300000 (5 min) - how often local segments are sealed and offloaded
+# - retention.ms=1800000 (30 min) - total retention; local data is trimmed from Redis after this
+# - remote.storage.enable=true - enable offload to S3
 kubectl exec kafka-cli -n korvet -- kafka-configs \
   --bootstrap-server korvet.korvet.svc.cluster.local:9092 \
   --entity-type topics --entity-name logs \
-  --alter --add-config 'bucket.duration.ms=300000,retention.ms=1800000,remote.storage.enable=true'
+  --alter --add-config 'segment.ms=300000,retention.ms=1800000,remote.storage.enable=true'
 
 # Step 13: Deploy Logstash
 echo ""

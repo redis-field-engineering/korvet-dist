@@ -52,14 +52,14 @@ This sample uses an S3-compatible URI for Korvet remote storage:
 
 [source,text]
 ----
-s3a://korvet/delta
+s3://korvet/cold
 ----
 
 Korvet writes archived topic data to MinIO using static credentials configured in `docker-compose.yml`.
 
 == Korvet Tuning
 
-With the current `redisfield/korvet:early-access` image, the Logstash consumer can stall under the full 40-partition subscription unless Korvet is given more headroom for Redis connections, server backpressure, and archival cadence.
+With the current `redisfield/korvet:early-access` image, the Logstash consumer can stall under the full 40-partition subscription unless Korvet is given more headroom for Redis connections, server backpressure, and storage-worker cadence.
 
 When that happens, the usual symptoms are:
 
@@ -76,8 +76,6 @@ KORVET_STORAGE_LOCAL_REDIS_POOL_SIZE: 64
 KORVET_REDIS_POOL_MAX_WAIT: 10s
 KORVET_BROKER_MAX_PENDING_BYTES: 268435456
 KORVET_BROKER_RESUME_PENDING_BYTES: 134217728
-KORVET_ARCHIVER_SCAN_INTERVAL: 60s
-KORVET_ARCHIVER_BATCH_SIZE: 100000
 ----
 
 These settings were validated against the current sample wiring:

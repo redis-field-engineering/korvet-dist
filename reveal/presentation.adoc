@@ -88,7 +88,7 @@ image::../../korvet.svg[Korvet Logo,100]
 
 [%step]
 * *Produce:* Filebeat/Logstash → Kafka protocol → Redis Streams
-* *Tier:* Background job moves old data → Delta Lake
+* *Tier:* Background job moves old data → Apache Iceberg
 * *Consume:* Spark/Databricks → Kafka protocol → Hot or Cold (transparent)
 
 == Demo

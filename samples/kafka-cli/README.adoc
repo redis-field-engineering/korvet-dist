@@ -114,9 +114,9 @@ docker compose exec kafka-tools /opt/kafka/bin/kafka-console-consumer.sh \
 docker compose exec redis redis-cli
 
 # Inside Redis CLI:
-KEYS "default:*"                    # List all topics
-XLEN "default:demo-topic:0"         # Count messages
-XRANGE "default:demo-topic:0" - + COUNT 10  # Read messages
+KEYS "korvet:storage:local:*"                          # List partition streams
+XLEN "korvet:storage:local:demo-topic:0"               # Count messages
+XRANGE "korvet:storage:local:demo-topic:0" - + COUNT 10  # Read messages
 ----
 
 == Advanced Examples
@@ -193,26 +193,19 @@ docker compose exec kafka-tools /opt/kafka/bin/kafka-topics.sh \
 
 == Message Format
 
-[IMPORTANT]
+[NOTE]
 ====
-By default, Korvet expects *JSON messages*. You have two options:
+Korvet stores record keys and values as opaque bytes, exactly like Kafka. There is no server-side payload format or validation, so *any* content works — JSON, plain text, Avro, Protobuf, or arbitrary binary.
 
-1. *Send valid JSON* (recommended):
-+
+The examples in this sample use JSON only because it is easy to read in the console:
+
 [source,json]
 ----
 {"message": "Hello", "id": 1}
 {"user": "alice", "action": "login"}
 ----
 
-2. *Configure RAW format* in `docker-compose.yml`:
-+
-[source,yaml]
-----
-environment:
-  KORVET_TOPICS_0_NAME: "*"
-  KORVET_TOPICS_0_VALUE_TYPE: RAW
-----
+Plain strings such as `Hello` are equally valid.
 ====
 
 == Troubleshooting
@@ -241,16 +234,6 @@ docker compose logs korvet | grep "Started KorvetApplication"
 ----
 docker compose ps              # Check all services are "Up"
 docker compose logs korvet     # Check for errors
-----
-
-*JSON parsing errors?*
-
-Make sure you're sending valid JSON:
-
-[source,json]
-----
-{"message": "Hello"}  ✅ Valid
-Hello                 ❌ Invalid (unless RAW format configured)
 ----
 
 == What's Running

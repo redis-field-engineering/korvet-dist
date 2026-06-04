@@ -116,8 +116,8 @@ Port: 6379
 
 Korvet stores topic data in Redis Streams such as:
 
-* `default:USER_GAME:0`
-* `default:USER_LOSSES:0`
+* `korvet:storage:local:USER_GAME:0`
+* `korvet:storage:local:USER_LOSSES:0`
 
 === Useful Commands
 
@@ -163,13 +163,13 @@ docker compose down            # Stop all services
 
 * Client sends Kafka ProduceRequest
 * Korvet parses the request
-* Korvet writes to Redis Stream: `XADD default:USER_GAME:0 * value <json>`
+* Korvet writes to Redis Stream: `XADD korvet:storage:local:USER_GAME:0 * value <json>`
 * Korvet sends ProduceResponse back to client
 
 **Consume Request:**
 
 * Client sends Kafka FetchRequest
-* Korvet reads from Redis Stream: `XREAD STREAMS default:USER_GAME:0 <offset>`
+* Korvet reads from Redis Stream: `XREAD STREAMS korvet:storage:local:USER_GAME:0 <offset>`
 * Korvet formats response as Kafka FetchResponse
 * Client receives messages in standard Kafka format
 
@@ -177,7 +177,7 @@ docker compose down            # Stop all services
 
 [source,text]
 ----
-Key: default:USER_GAME:0
+Key: korvet:storage:local:USER_GAME:0
 Type: Stream
 Entries: [
   {id: "1234567890-0", fields: {value: "{\"user\":\"player123\",...}"}},
@@ -254,9 +254,9 @@ Should return:
 docker compose exec redis redis-cli
 
 # Inside Redis CLI:
-KEYS "default:*"                      # List all topics
-XLEN "default:USER_GAME:0"            # Count messages in USER_GAME
-XRANGE "default:USER_GAME:0" - + COUNT 10  # Read last 10 messages
+KEYS "korvet:storage:local:*"                      # List all topics
+XLEN "korvet:storage:local:USER_GAME:0"            # Count messages in USER_GAME
+XRANGE "korvet:storage:local:USER_GAME:0" - + COUNT 10  # Read last 10 messages
 ----
 
 == Project Structure
@@ -436,8 +436,8 @@ Should return: `{"status":"ok","korvet":"connected",...}`
 [source,bash]
 ----
 docker compose exec redis redis-cli
-KEYS "default:*"
-XLEN "default:USER_GAME:0"
+KEYS "korvet:storage:local:*"
+XLEN "korvet:storage:local:USER_GAME:0"
 ----
 
 4. Check consumer is subscribed to correct topics:
@@ -517,13 +517,13 @@ docker compose logs -f redis
 docker compose exec redis redis-cli
 
 # List all topics
-docker compose exec redis redis-cli KEYS "default:*"
+docker compose exec redis redis-cli KEYS "korvet:storage:local:*"
 
 # Count messages in a topic
-docker compose exec redis redis-cli XLEN "default:USER_GAME:0"
+docker compose exec redis redis-cli XLEN "korvet:storage:local:USER_GAME:0"
 
 # Read messages from a topic
-docker compose exec redis redis-cli XRANGE "default:USER_GAME:0" - + COUNT 10
+docker compose exec redis redis-cli XRANGE "korvet:storage:local:USER_GAME:0" - + COUNT 10
 
 # Test API health
 curl http://localhost:3000/api/health
@@ -573,7 +573,7 @@ Just point your client to `localhost:9092` instead of a Kafka broker!
 * Implements the Kafka wire protocol
 * Uses Redis Streams as the backend storage (instead of Kafka's log segments)
 * Works with standard Kafka clients without code changes
-* Provides automatic hot/cold data tiering (Redis → Delta Lake on S3)
+* Provides automatic hot/cold data tiering (Redis → Apache Iceberg on S3)
 
 **Key Insight:** Any application using Kafka clients can point to Korvet instead, and it "just works" because Korvet masquerades as a Kafka broker.
 
