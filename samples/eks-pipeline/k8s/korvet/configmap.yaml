@@ -1,8 +1,8 @@
 # =============================================================================
 # Korvet ConfigMap
 # =============================================================================
-# Update KORVET_STORAGE_PATH with output from:
-#   terraform output s3_delta_path
+# Update KORVET_STORAGE_REMOTE_PATH with output from:
+#   terraform output s3_bucket_name
 # =============================================================================
 apiVersion: v1
 kind: ConfigMap
@@ -17,18 +17,18 @@ data:
   KORVET_REDIS_URI: "redis://korvet-db.redis.svc.cluster.local:19750"
   KORVET_REDIS_CLUSTER: "true"
 
-  # Tiered storage: 10 min hot (Redis), 1 day cold (S3)
+  # Remote (cold) tier: Apache Iceberg table on S3.
   # Replace S3_BUCKET with: terraform output s3_bucket_name
-  KORVET_STORAGE_REMOTE_PATH: "s3a://S3_BUCKET/korvet/delta"
-  # Replace REGION with your AWS region
+  KORVET_STORAGE_REMOTE_PATH: "s3://S3_BUCKET/korvet"
+  # Replace with your AWS region
   KORVET_STORAGE_REMOTE_S3_REGION: "us-west-2"
-  # Use IRSA for S3 credentials (EKS IAM Roles for Service Accounts)
-  KORVET_STORAGE_REMOTE_S3_CREDENTIALS_TYPE: "IRSA"
+  # No static S3 credentials are set: with IRSA (EKS IAM Roles for Service
+  # Accounts), AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE are injected into
+  # the pod and picked up automatically by the AWS SDK default credential chain.
 
-  # Archiver configuration
-  KORVET_ARCHIVER_BATCH_SIZE: "10000"
-  KORVET_ARCHIVER_MAX_CONCURRENT_STREAMS: "4"
-  KORVET_ARCHIVER_SCAN_INTERVAL: "PT1M"
-
-  # Trimmer configuration
-  KORVET_TRIMMER_SCAN_INTERVAL: "PT1H"
+  # The leader-locked storage worker (default tick 1m) offloads sealed segments
+  # and enforces retention; no override needed.
+  #
+  # Tiering is enabled per topic via Kafka topic config, e.g.:
+  #   kafka-configs --alter --entity-type topics --entity-name <topic> \
+  #     --add-config remote.storage.enable=true,local.retention.ms=86400000

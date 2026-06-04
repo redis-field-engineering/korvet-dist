@@ -85,12 +85,13 @@ show_redis() {
 
     echo ""
     echo "Stream counts (sample):"
-    # Stream keys are now logical keys like korvet:stream:<topic>:<partition> with bucket suffixes :b<epoch>.
+    # Local-tier stream keys are korvet:storage:local:<topic>:<partition>, with sealed
+    # segments stored under a :<segmentId> suffix.
     # Use SCAN instead of KEYS to avoid blocking Redis on large datasets.
     KEYS=$(run_with_timeout 10 redis-cli -h localhost -p ${REDIS_PORT} -a "$REDIS_PASSWORD" --no-auth-warning \
-        --scan --pattern 'korvet:stream:logs:*' 2>/dev/null | grep -E ':b[0-9]+$' | head -4)
+        --scan --pattern 'korvet:storage:local:logs:*' 2>/dev/null | head -4)
     if [ -z "$KEYS" ]; then
-        echo "  No matching bucket stream keys found"
+        echo "  No matching stream keys found"
     else
         for key in $KEYS; do
             LEN=$(run_with_timeout 10 redis-cli -h localhost -p ${REDIS_PORT} -a "$REDIS_PASSWORD" --no-auth-warning XLEN "$key" 2>/dev/null)
@@ -144,15 +145,15 @@ show_s3() {
     fi
 
     echo ""
-    echo "Objects per partition:"
-    for i in 0 1 2 3; do
-        COUNT=$(aws s3 ls "s3://$S3_BUCKET/korvet/delta/korvet/stream/logs/$i/" --recursive 2>/dev/null | wc -l | tr -d ' ')
-        echo "  logs/$i: $COUNT files"
-    done
+    echo "Iceberg table (remote tier under s3://$S3_BUCKET/korvet):"
+    DATA_FILES=$(aws s3 ls "s3://$S3_BUCKET/korvet/" --recursive 2>/dev/null | grep -c '\.parquet$')
+    META_FILES=$(aws s3 ls "s3://$S3_BUCKET/korvet/metadata/" --recursive 2>/dev/null | wc -l | tr -d ' ')
+    echo "  Parquet data files: $DATA_FILES"
+    echo "  Metadata files:     $META_FILES"
 
     echo ""
     echo "Recent files (by time):"
-    aws s3 ls "s3://$S3_BUCKET/korvet/delta/" --recursive 2>/dev/null | sort -k1,2 | tail -5 | awk '{print "  " $1 " " $2 " - " $3 " bytes"}'
+    aws s3 ls "s3://$S3_BUCKET/korvet/" --recursive 2>/dev/null | sort -k1,2 | tail -5 | awk '{print "  " $1 " " $2 " - " $3 " bytes"}'
     echo ""
 }
 

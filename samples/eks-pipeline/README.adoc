@@ -62,8 +62,8 @@ Complete data pipeline on AWS EKS with Logstash, Korvet, Redis Enterprise, and t
 |Read from Korvet, write to Delta Lake
 
 |S3
-|Delta Lake format, ZSTD compression
-|Cold storage tier
+|Apache Iceberg table (Parquet data files)
+|Remote (cold) storage tier
 |===
 
 == Prerequisites
@@ -175,16 +175,16 @@ kubectl exec kafka-cli -n korvet -- kafka-topics \
 kubectl exec kafka-cli -n korvet -- kafka-configs \
   --bootstrap-server korvet.korvet.svc.cluster.local:9092 \
   --entity-type topics --entity-name logs \
-  --alter --add-config 'bucket.duration.ms=300000,retention.ms=1800000,remote.storage.enable=true'
+  --alter --add-config 'segment.ms=300000,retention.ms=1800000,remote.storage.enable=true'
 ----
 
 IMPORTANT: These settings must be configured **before** data is written:
 
-* `remote.storage.enable=true` - Enables archival to S3
-* `bucket.duration.ms=300000` - Buckets seal every 5 minutes and get archived
-* `retention.ms=1800000` - Data expires from Redis after 30 minutes (TTL = retention + bucket duration)
+* `remote.storage.enable=true` - Enables offload to S3
+* `segment.ms=300000` - Local segments seal every 5 minutes, after which they are eligible for offload
+* `retention.ms=1800000` - Total retention; local data is trimmed from Redis after 30 minutes
 
-For production, use longer durations (e.g., `bucket.duration.ms=3600000` for 1 hour) to reduce S3 API calls.
+For production, use longer durations (e.g., `segment.ms=3600000` for 1 hour) to reduce S3 API calls.
 
 === Step 7: Deploy Logstash
 
@@ -215,7 +215,7 @@ kubectl exec kafka-cli -n korvet -- kafka-run-class kafka.tools.GetOffsetShell \
 [source,bash]
 ----
 REDIS_PASSWORD=$(kubectl get secret redb-korvet-db -n redis -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec rec-0 -n redis -- redis-cli -h korvet-db -p 11030 -a "$REDIS_PASSWORD" --no-auth-warning KEYS 'korvet:stream:logs:*'
+kubectl exec rec-0 -n redis -- redis-cli -h korvet-db -p 11030 -a "$REDIS_PASSWORD" --no-auth-warning KEYS 'korvet:storage:local:logs:*'
 ----
 
 === Check S3 (Cold Tier)
@@ -244,22 +244,19 @@ curl -s http://localhost:9600/_node/stats/pipelines | jq '.pipelines.main.events
 
 |`remote.storage.enable`
 |false
-|**Must be set to `true`** to enable archival to S3
+|**Must be set to `true`** to enable offload to S3
 
-|`bucket.duration.ms`
-|3600000 (1 hour)
-|How often buckets are sealed and archived to S3
+|`segment.ms`
+|_server segment default_
+|How often local segments are sealed; sealed segments are eligible for offload to S3
 
 |`retention.ms`
 |604800000 (7 days)
-|TTL for data in Redis. Buckets expire after `retention.ms + bucket.duration.ms`
+|Total retention. Local data is trimmed from Redis once it ages past `local.retention.ms` (which defaults to `retention.ms`)
 |===
 
-IMPORTANT: TTL is set when data is written. If you change `retention.ms` after data exists,
-old data keeps its original TTL. To apply new settings, recreate the topic.
-
-NOTE: Size your Redis database to hold at least 2x the bucket duration worth of data
-to allow for archival lag.
+NOTE: Size your Redis database to hold at least 2x a segment's worth of data
+to allow for offload lag.
 
 === Scaling Logstash Throughput
 
@@ -324,6 +321,6 @@ kubectl exec deployment/korvet -n korvet -- aws sts get-caller-identity
 
 Check that:
 
-1. Topic has `bucket.duration.ms` set (default 1 hour may be too long for testing)
-2. Korvet is using `early-access` image (tiered storage fully supported)
-3. Enough time has passed for bucket to seal
+1. Topic has `segment.ms` set (the server default may be too long for testing)
+2. Korvet image includes tiered storage (`redisfield/korvet:latest` or newer)
+3. Enough time has passed for a segment to seal and be offloaded

@@ -34,7 +34,7 @@ help:
 	@echo "Debug:"
 	@echo "  make redis-cli    - Connect to Redis CLI"
 	@echo "  make minio        - Open MinIO console"
-	@echo "  make logs-archiver - View archiver logs"
+	@echo "  make logs-worker  - View storage worker logs"
 
 up:
 	@echo "Starting Korvet with tiered storage..."
@@ -42,7 +42,7 @@ up:
 	@echo "Configuration:"
 	@echo "  Hot tier:        Redis @ localhost:12000"
 	@echo "  Cold tier:       MinIO (S3-compatible) @ localhost:9000"
-	@echo "  Bucket duration: 10 seconds"
+	@echo "  Segment duration: 10 seconds"
 	@echo ""
 	docker compose up -d
 	@echo "Waiting for services to be healthy..."
@@ -69,9 +69,9 @@ clean:
 logs:
 	docker compose logs -f korvet
 
-logs-archiver:
-	@echo "=== Archiver Logs ==="
-	@docker compose logs korvet 2>&1 | grep -i -E "(archiv|tiered|delta)" | tail -30
+logs-worker:
+	@echo "=== Storage Worker Logs ==="
+	@docker compose logs korvet 2>&1 | grep -i -E "(offload|segment|storage worker)" | tail -30
 
 status:
 	@echo "Service Status:"
@@ -90,11 +90,11 @@ create-topic:
 		--config local.retention.ms=15000 \
 		--config retention.ms=86400000 \
 		2>/dev/null || echo "Topic may already exist"
-	@echo "Setting bucket duration to 10 seconds..."
+	@echo "Setting segment duration to 10 seconds..."
 	@docker compose exec kafka-tools /opt/kafka/bin/kafka-configs.sh \
 		--bootstrap-server korvet:9092 \
 		--entity-type topics --entity-name tiered-test \
-		--alter --add-config bucket.duration.ms=10000 \
+		--alter --add-config segment.ms=10000 \
 		2>/dev/null || true
 
 describe-topic:
@@ -107,8 +107,8 @@ test-tiered:
 	@echo "=== Tiered Storage Test ==="
 	@echo ""
 	@echo "Configuration:"
-	@echo "  - Bucket duration: 10 seconds"
-	@echo "  - Archiver interval: 5 seconds"
+	@echo "  - Segment duration: 10 seconds"
+	@echo "  - Storage worker tick interval: 5 seconds"
 	@echo "  - Topic: tiered-test (with remote.storage.enable=true)"
 	@echo ""
 	@echo "Step 1: Creating topic..."
@@ -120,7 +120,7 @@ test-tiered:
 	@echo "Step 3: Consuming messages immediately (before archival)..."
 	@$(MAKE) test-consume
 	@echo ""
-	@echo "Step 4: Waiting 30 seconds for bucket rotation and archival..."
+	@echo "Step 4: Waiting 30 seconds for segment rollover and offload..."
 	@for i in 1 2 3 4 5 6; do sleep 5; echo "  $$((i*5))s elapsed..."; done
 	@echo ""
 	@echo "Step 5: Verifying data archived to cold tier..."
@@ -151,14 +151,14 @@ test-verify:
 	@echo "=== Verifying Data in Both Tiers ==="
 	@echo ""
 	@echo "Hot tier (Redis streams):"
-	@redis-cli -p 12000 KEYS 'korvet:stream:tiered-test:*' 2>/dev/null | head -10 || echo "  Could not connect"
+	@redis-cli -p 12000 KEYS 'korvet:storage:local:tiered-test:*' 2>/dev/null | head -10 || echo "  Could not connect"
 	@echo ""
 	@echo "Cold tier (MinIO/S3):"
 	@docker compose exec minio mc alias set myminio http://localhost:9000 minioadmin minioadmin >/dev/null 2>&1 || true
 	@docker compose exec minio mc ls myminio/korvet/ --recursive 2>/dev/null | head -20 || echo "  No files in cold storage"
 	@echo ""
-	@echo "Archiver logs:"
-	@docker compose logs korvet 2>&1 | grep -i -E "(archived|error)" | tail -5 || echo "  No archiver logs"
+	@echo "Storage worker logs:"
+	@docker compose logs korvet 2>&1 | grep -i -E "(offload|segment|error)" | tail -5 || echo "  No storage worker logs"
 
 redis-cli:
 	@echo "Connecting to Redis at localhost:12000..."

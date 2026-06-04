@@ -28,7 +28,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: korvet
-          image: redisfield/korvet:early-access
+          image: redisfield/korvet:latest
           ports:
             - containerPort: 9092
               name: kafka

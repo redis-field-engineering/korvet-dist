@@ -7,7 +7,7 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet:early-access
+    image: redisfield/korvet:latest
     pull_policy: always
     ports:
       - "19092:9092"
@@ -17,7 +17,6 @@ services:
       KORVET_BROKER_ADVERTISED_HOST: korvet
       KORVET_TOPICS_0_NAME: "*"
       KORVET_TOPICS_0_AUTO_CREATE: "true"
-      KORVET_TOPICS_0_PARTITIONS: "1"
     depends_on:
       - korvet-redis
 
