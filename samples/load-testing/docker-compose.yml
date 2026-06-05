@@ -8,7 +8,7 @@ services:
       - "6379:6379"
 
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:0.16.0
     pull_policy: always
     ports:
       - "9092:9092"
