@@ -1,7 +1,14 @@
-# Shared Prometheus + Grafana services for Korvet observability
-# Include this in your docker-compose.yml with:
-#   include:
-#     - ../../observability/docker-compose.yml
+# Shared Prometheus + Grafana services for Korvet observability.
+#
+# This file is the single source of truth for the monitoring stack. It is
+# consumed two ways:
+#   1. The standalone sample in this directory (docker-compose.yml includes it).
+#   2. Other samples / your own compose, via:
+#        include:
+#          - ../observability/monitoring.yml
+#
+# It expects a `korvet` service exposing actuator metrics on :8080 to exist in
+# the composed stack (see prometheus.yml scrape target).
 
 services:
   prometheus:

@@ -87,7 +87,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (topic) (irate(korvet_produce_messages_total[1m]))",
+          "expr": "sum by (topic) (irate(korvet_broker_produce_records_total[1m]))",
           "refId": "A",
           "legendFormat": "{{topic}}"
         }
@@ -174,7 +174,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (topic, le) (rate(korvet_produce_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (topic, le) (rate(korvet_broker_produce_seconds_bucket[5m])))",
           "refId": "A",
           "legendFormat": "p99 - {{topic}}"
         },
@@ -183,7 +183,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (topic, le) (rate(korvet_produce_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (topic, le) (rate(korvet_broker_produce_seconds_bucket[5m])))",
           "refId": "B",
           "legendFormat": "p95 - {{topic}}"
         },
@@ -192,7 +192,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum by (topic, le) (rate(korvet_produce_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (topic, le) (rate(korvet_broker_produce_seconds_bucket[5m])))",
           "refId": "C",
           "legendFormat": "p50 - {{topic}}"
         }
@@ -279,12 +279,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (topic) (irate(korvet_fetch_messages_total[1m]))",
+          "expr": "sum by (topic) (irate(korvet_broker_fetch_seconds_count[1m]))",
           "refId": "A",
           "legendFormat": "{{topic}}"
         }
       ],
-      "title": "Fetch Rate (messages/sec)",
+      "title": "Fetch Request Rate (req/sec)",
       "type": "timeseries"
     },
     {
@@ -366,7 +366,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (topic, le) (rate(korvet_fetch_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (topic, le) (rate(korvet_broker_fetch_seconds_bucket[5m])))",
           "refId": "A",
           "legendFormat": "p99 - {{topic}}"
         },
@@ -375,7 +375,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (topic, le) (rate(korvet_fetch_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (topic, le) (rate(korvet_broker_fetch_seconds_bucket[5m])))",
           "refId": "B",
           "legendFormat": "p95 - {{topic}}"
         },
@@ -384,7 +384,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum by (topic, le) (rate(korvet_fetch_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (topic, le) (rate(korvet_broker_fetch_seconds_bucket[5m])))",
           "refId": "C",
           "legendFormat": "p50 - {{topic}}"
         }
@@ -475,7 +475,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (operation) (rate(korvet_errors_total[5m])) / (sum(rate(korvet_produce_messages_total[5m])) + sum(rate(korvet_fetch_requests_total[5m])))",
+          "expr": "sum by (operation) (rate(korvet_broker_failures_total[5m])) / (sum(rate(korvet_broker_produce_records_total[5m])) + sum(rate(korvet_broker_fetch_seconds_count[5m])))",
           "refId": "A",
           "legendFormat": "{{operation}}"
         }
@@ -562,12 +562,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (topic) (rate(korvet_produce_bytes_total[5m]))",
+          "expr": "sum by (api_key) (rate(korvet_broker_frame_size_bytes_sum{direction=\"request\"}[5m]))",
           "refId": "A",
-          "legendFormat": "{{topic}}"
+          "legendFormat": "{{api_key}}"
         }
       ],
-      "title": "Ingress Throughput (bytes/sec)",
+      "title": "Ingress Throughput (request bytes/sec)",
       "type": "timeseries"
     },
     {
@@ -649,12 +649,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (topic) (rate(korvet_fetch_bytes_total[5m]))",
+          "expr": "sum by (api_key) (rate(korvet_broker_frame_size_bytes_sum{direction=\"response\"}[5m]))",
           "refId": "A",
-          "legendFormat": "{{topic}}"
+          "legendFormat": "{{api_key}}"
         }
       ],
-      "title": "Egress Throughput (bytes/sec)",
+      "title": "Egress Throughput (response bytes/sec)",
       "type": "timeseries"
     },
     {
