@@ -12,7 +12,7 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:0.16.1
     pull_policy: always
     ports:
       - "9092:9092"

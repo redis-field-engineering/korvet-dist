@@ -7,7 +7,7 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:0.16.1
     pull_policy: always
     ports:
       - "19092:9092"
@@ -30,6 +30,10 @@ services:
   # Kafka Connect standalone worker with Kafka's built-in file sink connector
   kafka-connect:
     image: apache/kafka:3.7.0
+    # Run as root so the file sink can write to the bind-mounted output dir
+    # regardless of host ownership (the container's default uid otherwise hits
+    # AccessDeniedException on Linux hosts).
+    user: root
     volumes:
       - ./connect-standalone.properties:/opt/kafka/config/connect-standalone.properties:ro
       - ./file-sink.properties:/opt/kafka/config/file-sink.properties:ro

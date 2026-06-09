@@ -7,13 +7,16 @@ services:
 
   # Korvet Server - Kafka-compatible streaming service
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:0.16.1
     pull_policy: always
     ports:
       - "9092:9092"
     environment:
       KORVET_REDIS_URI: redis://redis:6379
       KORVET_BROKER_ADVERTISED_HOST: korvet
+      # Catch-all topic defaults so Filebeat can create filebeat-logs on first publish
+      KORVET_TOPICS_0_NAME: "*"
+      KORVET_TOPICS_0_AUTO_CREATE: "true"
     depends_on:
       - redis
 

@@ -86,13 +86,14 @@ collect_korvet_metrics() {
     
     # Messages produced
     local messages=$(curl -s "http://${KORVET_HOST}:${KORVET_ACTUATOR_PORT}/actuator/prometheus" | \
-        grep '^korvet_produce_messages_total' | grep -v '#' | \
+        grep '^korvet_broker_produce_records_total' | grep -v '#' | \
         awk '{sum += $2} END {print sum}')
     echo "Messages produced: ${messages}" >> "${result_file}"
-    
-    # Bytes produced
+
+    # Bytes produced (inbound produce request frames)
     local bytes=$(curl -s "http://${KORVET_HOST}:${KORVET_ACTUATOR_PORT}/actuator/prometheus" | \
-        grep '^korvet_produce_bytes_total' | grep -v '#' | \
+        grep '^korvet_broker_frame_size_bytes_sum{' | grep -v '#' | \
+        grep 'api_key="produce"' | grep 'direction="request"' | \
         awk '{sum += $2} END {print sum}')
     local mb=$(echo "scale=2; ${bytes}/1024/1024" | bc)
     echo "Bytes produced: ${bytes} (${mb} MB)" >> "${result_file}"
@@ -271,7 +272,7 @@ restart_korvet() {
     local pool_size=$1
 
     # Find Korvet process
-    local korvet_pid=$(pgrep -f "korvet-app.*jar" || true)
+    local korvet_pid=$(pgrep -f "korvet-server.*jar" || true)
 
     if [ -n "${korvet_pid}" ]; then
         log "Stopping Korvet (PID: ${korvet_pid})..."
@@ -287,8 +288,10 @@ restart_korvet() {
 
     # Start Korvet with new pool size
     log "Starting Korvet with pool size ${pool_size}..."
-    cd "$(dirname "$0")/.."
-    ./gradlew :korvet-app:bootRun --args="--korvet.redis.pool-size=${pool_size} --korvet.redis.port=${REDIS_PORT}" > /dev/null 2>&1 &
+    # gradlew lives at the repo root, three levels up from this script.
+    local repo_root
+    repo_root="$(cd "$(dirname "$0")/../../.." && pwd)"
+    ( cd "${repo_root}" && ./gradlew :korvet-server:bootRun --args="--korvet.redis.pool-size=${pool_size} --korvet.redis.port=${REDIS_PORT}" > /dev/null 2>&1 ) &
 
     # Wait for Korvet to be ready
     log "Waiting for Korvet to be ready..."
