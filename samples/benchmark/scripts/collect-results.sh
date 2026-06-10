@@ -2,13 +2,12 @@
 #
 # Collect and display benchmark results from the PVC
 #
-# Usage: ./collect-results.sh [--format csv|json|table]
+# Usage: ./collect-results.sh
 #
 
 set -e
 
 NAMESPACE="${NAMESPACE:-korvet-benchmark}"
-FORMAT="${1:-table}"
 
 echo "=== Benchmark Results ==="
 echo ""

@@ -1,5 +1,10 @@
+# Standalone observability sample: Redis + Korvet + Prometheus + Grafana,
+# plus a kafka-tools container for generating load to populate the dashboard.
+#
+# The Prometheus + Grafana services live in monitoring.yml so the same stack
+# can be reused (via `include`) by other samples and by your own compose files.
 include:
-  - ../observability/monitoring.yml
+  - ./monitoring.yml
 
 services:
   redis:
@@ -12,6 +17,7 @@ services:
     pull_policy: always
     ports:
       - "9092:9092"
+      - "8080:8080"
     environment:
       - KORVET_REDIS_URI=redis://redis:6379
       - KORVET_BROKER_ADVERTISED_HOST=korvet
@@ -20,6 +26,7 @@ services:
     depends_on:
       - redis
 
+  # Kafka CLI tools for generating produce/consume load (see the Makefile).
   kafka-tools:
     image: apache/kafka
     command: sleep infinity

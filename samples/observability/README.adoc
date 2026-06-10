@@ -1,0 +1,83 @@
+= Korvet Observability Sample
+:toc:
+:icons: font
+
+A complete, runnable observability stack for Korvet: Redis, Korvet, Prometheus,
+and a pre-built Grafana dashboard, plus Kafka CLI tools for generating load.
+
+== Contents
+
+* `docker-compose.yml` - Standalone stack (Redis + Korvet + monitoring + load tools)
+* `monitoring.yml` - Reusable Prometheus + Grafana services (included by the stack above)
+* `prometheus.yml` - Prometheus scrape configuration for Korvet metrics
+* `grafana-datasources.yml` - Grafana datasource provisioning (Prometheus)
+* `grafana-dashboards.yml` - Grafana dashboard provisioning
+* `dashboards/korvet-dashboard.json` - Korvet performance dashboard
+* `Makefile` - Convenience targets (`up`, `load`, `dashboard`, ...)
+
+== Quick Start
+
+[source,bash]
+----
+cd samples/observability
+make up         # Start Redis, Korvet, Prometheus, Grafana
+make load       # Generate produce/consume traffic
+make dashboard  # Open Grafana (anonymous admin, no login)
+----
+
+Grafana is at http://localhost:3000 and the Korvet dashboard loads
+automatically. Prometheus is at http://localhost:9090.
+
+== Reusing the Monitoring Stack
+
+The Prometheus + Grafana services live in `monitoring.yml` so they can be
+dropped into any other Compose stack that runs a `korvet` service exposing
+actuator metrics on port 8080. Include it from your own `docker-compose.yml`:
+
+[source,yaml]
+----
+include:
+  - ../observability/monitoring.yml
+
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  korvet:
+    image: redisfield/korvet:latest
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      - KORVET_REDIS_URI=redis://redis:6379
+      - KORVET_REDIS_METRICS_ENABLED=true
+    depends_on:
+      - redis
+----
+
+This adds Prometheus (port 9090) and Grafana (port 3000) to your stack. The
+`load-testing` sample uses exactly this pattern.
+
+== Dashboard Metrics
+
+The Korvet dashboard includes:
+
+* **Message Rates**: Produce and fetch rates (messages/sec) using `irate()` for real-time metrics
+* **Latency**: P50, P95, P99 latency percentiles for produce and fetch operations
+* **Throughput**: Ingress and egress bytes/sec
+* **Redis Metrics**: Command rates, latency percentiles, connection pool stats
+* **JVM Metrics**: Heap usage, GC activity, thread counts
+
+== Customization
+
+To customize the dashboard:
+
+1. Edit `dashboards/korvet-dashboard.json` directly, or
+2. Import into Grafana, make changes via UI, then export and save back to this file
+
+== See Also
+
+* link:../README.adoc[Korvet Samples]
+* link:../load-testing/README.adoc[Load Testing Sample]
