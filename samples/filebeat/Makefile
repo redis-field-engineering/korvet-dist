@@ -90,7 +90,9 @@ redis-stats:
 	@docker-compose exec -T redis redis-cli KEYS "korvet:storage:local:*"
 	@echo ""
 	@echo "Message Count (partition 0):"
-	@docker-compose exec -T redis redis-cli XLEN "korvet:storage:local:filebeat-logs:0" 2>/dev/null || echo "0"
+	@# New topics use segmented storage: messages live in per-segment streams
+	@# "korvet:storage:local:filebeat-logs:0:<segmentId>". Sum XLEN across them.
+	@docker-compose exec -T redis sh -c 'total=0; for k in $$(redis-cli --scan --pattern "korvet:storage:local:filebeat-logs:0*"); do n=$$(redis-cli XLEN "$$k" 2>/dev/null || echo 0); total=$$((total + n)); done; echo $$total'
 
 # Tail the generated log file
 tail-logs:

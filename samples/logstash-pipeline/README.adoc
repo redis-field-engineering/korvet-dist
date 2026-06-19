@@ -1,0 +1,91 @@
+= Logstash Pipeline
+:toc:
+:icons: font
+
+== Overview
+
+This sample runs a local end-to-end Korvet pipeline with Docker Compose:
+
+* Redis Enterprise DB on `localhost:12000` as the storage backend
+* `redisfield/korvet:latest`
+* One Logstash producer generating synthetic log events into `logs`
+* One Logstash consumer reading `logs`, enriching events, and writing to `logs-processed`
+
+By default Korvet runs with hot-tier (Redis) storage only — no remote storage path is configured.
+Remote (tiered) storage is opt-in: set `REMOTE_STORAGE_PATH` to add a MinIO-backed S3 cold tier (see <<Remote Storage>>).
+
+Before Korvet starts, `make up` flushes the Redis Enterprise DB on `localhost:12000` for a clean run (and, in tiered mode, removes local MinIO data).
+
+The `logs` topic is created or updated with these Korvet settings:
+
+* `retention.ms=86400000` (1 day)
+* `local.retention.bytes=214748364` (80% of the default 256 MiB Redis budget)
+* `partitions=4`
+* `remote.storage.enable=true` (tiered mode only)
+
+The `logs-processed` topic is also created or updated with:
+
+* `local.retention.bytes=214748364`
+
+== Quick Start
+
+[source,bash]
+----
+cd samples/logstash-pipeline
+make up
+make describe-topics
+make consume
+----
+
+`make up` starts Korvet and Kafka tools first, waits until Korvet accepts Kafka admin requests, ensures the topics exist with the required settings, and only then starts the Logstash producer and consumer containers.
+
+== Remote Storage
+
+Remote storage is disabled by default. To run with a MinIO-backed S3 cold tier:
+
+[source,bash]
+----
+make up REMOTE_STORAGE_PATH=s3://korvet/cold
+----
+
+This layers `docker-compose.tiered.yml` on top of the base compose file, which:
+
+* starts MinIO on `localhost:9000` with the console on `localhost:9001` (`minioadmin` / `minioadmin`)
+* creates the `korvet` bucket
+* configures Korvet with `KORVET_STORAGE_REMOTE_PATH=$REMOTE_STORAGE_PATH` and static MinIO credentials
+* enables `remote.storage.enable=true` on the `logs` topic
+
+Korvet writes archived topic data to MinIO; verify with:
+
+[source,bash]
+----
+make verify-cold-storage REMOTE_STORAGE_PATH=s3://korvet/cold
+----
+
+Pass the same `REMOTE_STORAGE_PATH` value to operational `make` targets (`status`, `logs`, `verify-cold-storage`, ...) in a tiered run so they target the same compose stack.
+Teardown targets (`make down`, `make clean`) always include the tiered services, so they clean up a tiered run even without `REMOTE_STORAGE_PATH`.
+
+== Services
+
+* `korvet` exposes Kafka on `localhost:9092`
+* `korvet` health is available on http://localhost:8080/actuator/health
+* in tiered mode, MinIO exposes S3-compatible storage on http://localhost:9000 with the console at http://localhost:9001
+* sample data is reset under `samples/logstash-pipeline/data/` on each `make up`
+
+== Pipelines
+
+* `producer.conf` uses `java_generator` to emit 1000 synthetic log events per second into `logs`
+* `consumer.conf` reads `logs`, stamps `processed_at`, derives `severity` and `latency_class`, and writes to `logs-processed`
+
+== Useful Commands
+
+[source,bash]
+----
+make logs
+make logs-korvet
+make logs-producer
+make logs-consumer
+make show-config
+make status
+make clean
+----

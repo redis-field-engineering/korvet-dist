@@ -1,0 +1,39 @@
+services:
+  korvet:
+    image: redisfield/korvet:0.18.0
+    command: server
+    pull_policy: always
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      KORVET_REDIS_URI: redis://host.docker.internal:12000
+      KORVET_BROKER_ADVERTISED_HOST: korvet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  kafka-tools:
+    image: apache/kafka:latest
+    command: sleep infinity
+    depends_on:
+      - korvet
+
+  logstash-producer:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    profiles:
+      - pipeline
+    volumes:
+      - ./producer.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - korvet
+
+  logstash-consumer:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    profiles:
+      - pipeline
+    environment:
+      LOGSTASH_AUTO_OFFSET_RESET: ${LOGSTASH_AUTO_OFFSET_RESET:-latest}
+    volumes:
+      - ./consumer.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - korvet

@@ -1,0 +1,98 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  korvet:
+    image: redisfield/korvet:0.18.0
+    command: server
+    pull_policy: always
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      KORVET_REDIS_URI: redis://redis:6379
+      KORVET_BROKER_ADVERTISED_HOST: korvet
+      KORVET_REDIS_METRICS_ENABLED: "true"
+      KORVET_REDIS_METRICS_HISTOGRAM: "true"
+      KORVET_TOPICS_0_NAME: ${TOPIC:-logs}
+      KORVET_TOPICS_0_PARTITIONS: ${PARTITIONS:-4}
+      KORVET_TOPICS_0_LOG_APPEND_TIMESTAMP_HEADER: "true"
+    depends_on:
+      - redis
+
+  kafka-tools:
+    image: apache/kafka:latest
+    command: sleep infinity
+    depends_on:
+      - korvet
+
+  logstash-producer:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    profiles:
+      - pipeline
+    volumes:
+      - ./producer.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - korvet
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./data/minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/korvet-analytics;
+      "
+
+  spark-master:
+    image: apache/spark:3.5.0
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+      - "4040:4040"
+    volumes:
+      - ./spark_consumer.py:/opt/spark-apps/spark_consumer.py:ro
+      - ./read_delta.py:/opt/spark-apps/read_delta.py:ro
+
+  spark-worker:
+    image: apache/spark:3.5.0
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_MEMORY: 1G
+      SPARK_WORKER_CORES: 2
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark_consumer.py:/opt/spark-apps/spark_consumer.py:ro
+      - ./read_delta.py:/opt/spark-apps/read_delta.py:ro
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    depends_on:
+      - korvet

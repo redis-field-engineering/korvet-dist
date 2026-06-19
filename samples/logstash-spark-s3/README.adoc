@@ -1,0 +1,103 @@
+= Logstash to Spark Delta on S3
+:toc:
+:icons: font
+
+== Overview
+
+This sample runs a local analytics pipeline with Docker Compose:
+
+* Redis for Korvet storage
+* `redisfield/korvet:latest` with the Prometheus actuator endpoint exposed on http://localhost:8080/actuator/prometheus
+* Prometheus scraping Korvet on http://localhost:9090
+* Logstash generating synthetic events into the `logs` topic
+* Spark Structured Streaming consuming from Korvet through the Kafka API
+* MinIO as an S3-compatible target for Delta Lake tables
+
+Spark writes row-level event analytics to `s3a://korvet-analytics/delta/event-latencies`.
+The Delta table includes these timestamp columns:
+
+* `event_gen_timestamp`
+* `logstash_send_timestamp`
+* `logstash_payload_send_timestamp`
+* `korvet_receive_timestamp`
+* `korvet_send_timestamp`
+* `spark_read_timestamp`
+
+`korvet_receive_timestamp` is derived from Korvet's `korvet.log.append.timestamp.ms` Kafka record header.
+The sample enables that header with the `log.append.timestamp.header=true` topic configuration.
+
+Spark's Kafka source exposes the Kafka record timestamp as `kafka_record_timestamp`.
+Korvet currently preserves the producer record timestamp when rebuilding Kafka fetch responses, so this sample uses that value as `logstash_send_timestamp`.
+The payload-stamped `logstash_payload_send_timestamp` is retained for comparison.
+
+`korvet_send_timestamp` is included as a nullable column. Korvet does not currently expose a broker egress timestamp through Kafka fetch responses.
+
+== Quick Start
+
+[source,bash]
+----
+cd samples/logstash-spark-s3
+make up
+make spark-submit
+----
+
+In another terminal, inspect the generated Delta rows:
+
+[source,bash]
+----
+cd samples/logstash-spark-s3
+make read-delta
+----
+
+== Services
+
+* Korvet Kafka endpoint: `localhost:9092`
+* Korvet health: http://localhost:8080/actuator/health
+* Korvet Prometheus metrics: http://localhost:8080/actuator/prometheus
+* Prometheus: http://localhost:9090
+* Spark master UI: http://localhost:8081
+* Spark application UI: http://localhost:4040 while the streaming job is running
+* MinIO S3 endpoint: http://localhost:9000
+* MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`)
+
+== Data Flow
+
+. Logstash `java_generator` creates synthetic HTTP log events.
+. Logstash stamps `event_gen_timestamp` while building the event payload.
+. Logstash stamps `logstash_payload_send_timestamp` immediately before the Kafka output sends the event to Korvet.
+. Korvet appends the record to Redis Streams and returns Kafka-compatible offsets.
+. Spark reads the `logs` topic through the Kafka source.
+. Spark uses the Kafka record timestamp as `logstash_send_timestamp`.
+. Spark derives `korvet_receive_timestamp` from the `korvet.log.append.timestamp.ms` Kafka header.
+. Spark stamps `spark_read_timestamp`, computes latency columns, and writes Delta files to MinIO.
+
+== Delta Columns
+
+The Delta table includes the generated event fields plus:
+
+* `topic`, `partition`, `offset`
+* `kafka_record_timestamp`
+* `event_gen_timestamp`
+* `logstash_send_timestamp`
+* `logstash_payload_send_timestamp`
+* `korvet_receive_timestamp`
+* `korvet_send_timestamp`
+* `spark_read_timestamp`
+* `event_gen_to_logstash_send_latency_ms`
+* `logstash_send_to_korvet_receive_latency_ms`
+* `korvet_receive_to_spark_read_latency_ms`
+* `event_gen_to_spark_read_latency_ms`
+* `status_class`
+
+== Useful Commands
+
+[source,bash]
+----
+make status
+make logs-korvet
+make logs-logstash
+make logs-spark
+make stop-producer
+make start-producer
+make clean
+----

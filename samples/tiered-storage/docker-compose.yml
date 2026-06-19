@@ -1,6 +1,7 @@
 services:
   korvet:
-    image: redisfield/korvet:latest
+    image: redisfield/korvet:0.18.0
+    command: server
     pull_policy: always
     ports:
       - "9092:9092"

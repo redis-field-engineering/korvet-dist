@@ -342,5 +342,5 @@ CPU: 2.1 cores, Memory: 1.5GB
 == See Also
 
 * link:../kafka-cli/README.adoc[Kafka CLI Tools Demo]
-* link:../../observability/README.adoc[Observability Setup]
+* link:../observability/README.adoc[Observability Setup]
 * link:../../README.adoc[Korvet Project README]
