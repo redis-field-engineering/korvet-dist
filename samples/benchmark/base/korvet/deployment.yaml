@@ -29,7 +29,8 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: korvet
-          image: redisfield/korvet:latest
+          image: redisfield/korvet:0.18.0
+          args: ["server"]
           ports:
             - containerPort: 9092
               name: kafka

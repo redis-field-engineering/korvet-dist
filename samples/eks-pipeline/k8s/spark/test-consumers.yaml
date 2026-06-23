@@ -50,7 +50,6 @@ data:
 
     # 6 minutes ago (1 min before local retention of 5 min)
     start_ts = int((time.time() - 360) * 1000)
-    ts_json = f'{{"logs": {start_ts}}}'
 
     print("=" * 60)
     print(f"TEST: cold-to-hot - Starting from timestamp {start_ts}")
@@ -61,7 +60,7 @@ data:
         .format("kafka") \
         .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
         .option("subscribe", "logs") \
-        .option("startingOffsetsByTimestamp", ts_json) \
+        .option("startingTimestamp", str(start_ts)) \
         .option("kafka.group.id", "test-cold-to-hot-group") \
         .option("failOnDataLoss", "false") \
         .option("kafka.request.timeout.ms", "120000") \
@@ -90,7 +89,6 @@ data:
 
     # 4 minutes ago (within local retention of 5 min)
     start_ts = int((time.time() - 240) * 1000)
-    ts_json = f'{{"logs": {start_ts}}}'
 
     print("=" * 60)
     print(f"TEST: hot-only - Starting from timestamp {start_ts}")
@@ -101,7 +99,7 @@ data:
         .format("kafka") \
         .option("kafka.bootstrap.servers", "korvet.korvet.svc.cluster.local:9092") \
         .option("subscribe", "logs") \
-        .option("startingOffsetsByTimestamp", ts_json) \
+        .option("startingTimestamp", str(start_ts)) \
         .option("kafka.group.id", "test-hot-only-group") \
         .option("failOnDataLoss", "false") \
         .option("kafka.request.timeout.ms", "120000") \

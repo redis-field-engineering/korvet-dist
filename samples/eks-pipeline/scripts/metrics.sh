@@ -43,11 +43,8 @@ show_korvet() {
     # Get key metrics and format nicely
     METRICS=$(curl -s http://localhost:8080/actuator/prometheus 2>/dev/null)
     if [ -n "$METRICS" ]; then
-        echo "Produce bytes per partition:"
-        echo "$METRICS" | grep "^korvet_produce_bytes_total" | sed 's/korvet_produce_bytes_total{partition="/  partition /; s/",topic="logs"} / = /; s/$/ bytes/'
-        echo ""
-        echo "Produce messages per partition:"
-        echo "$METRICS" | grep "^korvet_produce_messages_total" | sed 's/korvet_produce_messages_total{partition="/  partition /; s/",topic="logs"} / = /; s/$/ messages/'
+        echo "Produce records per topic:"
+        echo "$METRICS" | grep "^korvet_broker_produce_records_total" | sed 's/^korvet_broker_produce_records_total//'
         echo ""
         echo "Archival:"
         echo "$METRICS" | grep "^korvet_archival" | head -5

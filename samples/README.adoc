@@ -71,7 +71,7 @@ make demo
 ----
 
 
-=== link:grafana/README.adoc[Grafana Metrics Demo]
+=== link:observability/README.adoc[Observability Demo]
 
 Complete observability stack with Prometheus and Grafana dashboards.
 
@@ -96,8 +96,9 @@ Complete observability stack with Prometheus and Grafana dashboards.
 
 [source,bash]
 ----
-cd grafana
+cd observability
 make up
+make load       # Generate traffic
 make dashboard  # Opens Grafana in browser
 ----
 
@@ -155,32 +156,57 @@ make up
 make tail-output
 ----
 
-=== link:logstash-tiered-pipeline/README.adoc[Logstash Tiered Pipeline]
+=== link:logstash-pipeline/README.adoc[Logstash Pipeline]
 
 End-to-end local pipeline using Docker Compose with Redis, Korvet, and two Logstash instances.
 
 **Includes:**
 
-* `redis:latest` for hot-tier storage
+* Redis Enterprise DB for hot-tier storage
 * `redisfield/korvet:latest` for Kafka-compatible streaming
 * Logstash producer generating synthetic logs into `logs`
 * Logstash consumer enriching events into `logs-processed`
-* Topic recreation with tiered-storage settings matching `eks-pipeline`
-* Local filesystem cold storage under `./data/cold`
+* Optional MinIO-backed S3 cold storage via `REMOTE_STORAGE_PATH` (disabled by default)
 
 **Use Cases:**
 
-* Local reproduction of the EKS pipeline flow
 * Logstash producer/consumer Kafka compatibility testing
-* Tiered storage demos without S3 or Kubernetes
+* Optional tiered storage demos without Kubernetes
 
 **Quick Start:**
 
 [source,bash]
 ----
-cd samples/logstash-tiered-pipeline
+cd samples/logstash-pipeline
 make up
 make consume
+----
+
+=== link:logstash-spark-s3/README.adoc[Logstash to Spark Delta on S3]
+
+Local analytics pipeline using Korvet's Kafka API with Logstash, Spark Structured Streaming, Delta Lake, MinIO S3, and Prometheus metrics.
+
+**Includes:**
+
+* `redisfield/korvet:latest` with `/actuator/prometheus` exposed
+* Logstash synthetic event generation into Korvet
+* Spark consumer writing event latency analytics as Delta tables to S3-compatible storage
+* MinIO for local S3 storage
+* Prometheus scrape config for Korvet metrics
+
+**Use Cases:**
+
+* End-to-end latency analytics
+* Spark and Delta Lake sink compatibility testing
+* Local observability of a Logstash-to-Korvet ingestion path
+
+**Quick Start:**
+
+[source,bash]
+----
+cd samples/logstash-spark-s3
+make up
+make spark-submit
 ----
 
 == Prerequisites
@@ -226,6 +252,7 @@ docker run -d -p 6379:6379 redis
 # Comment out the korvet service
 # korvet:
 #   image: redisfield/korvet:latest
+#   command: server
 #   ...
 
 # Update Filebeat to connect to host machine
