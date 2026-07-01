@@ -1,0 +1,215 @@
+= Kafka Client Examples (Java & Python)
+:toc:
+:icons: font
+
+== Overview
+
+This sample shows how to use standard Kafka clients with Korvet. Korvet speaks
+the Kafka wire protocol, so these are ordinary Kafka clients pointed at Korvet's
+broker on port 9092 — no Korvet-specific libraries are required.
+
+*What it demonstrates:*
+
+* ✅ A Java producer and consumer using `org.apache.kafka:kafka-clients`
+* ✅ A Python producer and consumer using `confluent-kafka` (librdkafka-backed)
+* ✅ Consumer groups with manual offset commit (`commitSync` / `commit`)
+* ✅ How to enable SASL (SCRAM-SHA-256) and TLS on both the broker and the clients
+
+Out of the box every example connects to a Korvet broker on PLAINTEXT at
+`localhost:9092` with no authentication.
+
+== Prerequisites
+
+* A running Korvet broker reachable at `localhost:9092`
+* Java 17+ and Maven (for the Java examples)
+* Python 3.8+ and pip (for the Python examples)
+
+The simplest way to get a local Korvet stack is the link:../kafka-cli/README.adoc[kafka-cli sample]:
+
+[source,bash]
+----
+cd samples/kafka-cli
+make up
+----
+
+Or run Korvet directly with Docker (it needs a Redis to talk to):
+
+[source,bash]
+----
+# Shared network so Korvet can reach Redis by name
+docker network create korvet-net
+
+# Start Redis
+docker run -d --name redis --network korvet-net redis:latest
+
+# Start Korvet (Kafka on 9092, admin/health on 8080)
+docker run -d --name korvet --network korvet-net -p 9092:9092 -p 8080:8080 \
+  -e KORVET_REDIS_URI=redis://redis:6379 \
+  redisfield/korvet:latest server
+----
+
+Check that Korvet is healthy:
+
+[source,bash]
+----
+curl http://localhost:8080/actuator/health
+----
+
+== Running the Java Client
+
+From `samples/clients/java`:
+
+[source,bash]
+----
+# Send a handful of records to the 'client-demo' topic
+mvn -q compile exec:java -Dexec.mainClass=Producer
+
+# Consume them with a consumer group (Ctrl-C to stop)
+mvn -q compile exec:java -Dexec.mainClass=Consumer
+----
+
+The producer sends 5 keyed JSON records. The consumer joins the
+`client-demo-group` group, reads from the beginning, and commits offsets
+manually with `commitSync()` after each batch.
+
+== Running the Python Client
+
+From `samples/clients/python`:
+
+[source,bash]
+----
+# Install the client (a virtualenv is recommended)
+pip install -r requirements.txt
+
+# Send a handful of records to the 'client-demo' topic
+python producer.py
+
+# Consume them with a consumer group (Ctrl-C to stop)
+python consumer.py
+----
+
+The consumer sets `enable.auto.commit=False` and calls `commit()` after each
+message, printing the topic, partition, and offset as it goes.
+
+== Authentication and TLS
+
+By default Korvet listens on PLAINTEXT with no authentication. You can turn on
+SASL (SCRAM-SHA-256) and TLS on the broker, then point the clients at it with a
+matching `SASL_SSL` config. Note that the `PLAIN` mechanism requires TLS.
+
+=== Korvet Server Configuration
+
+Enable SASL and TLS on the broker via environment variables:
+
+[source,bash]
+----
+docker run -d --name korvet -p 9092:9092 -p 8080:8080 \
+  -e SPRING_DATA_REDIS_HOST=host.docker.internal \
+  -e KORVET_BROKER_SASL_ENABLED=true \
+  -e KORVET_BROKER_SASL_MECHANISMS=SCRAM-SHA-256 \
+  -e KORVET_BROKER_TLS=true \
+  -e KORVET_BROKER_CERT_FILE=/certs/server.crt \
+  -e KORVET_BROKER_KEY_FILE=/certs/server.key \
+  -v "$PWD/certs:/certs:ro" \
+  redisfield/korvet:latest server
+----
+
+Equivalent property names (for `application.yml` or `-D` flags):
+
+[source,properties]
+----
+korvet.broker.sasl.enabled=true
+korvet.broker.sasl.mechanisms=SCRAM-SHA-256   # also supports PLAIN, but PLAIN requires TLS
+korvet.broker.tls=true
+korvet.broker.cert-file=/certs/server.crt
+korvet.broker.key-file=/certs/server.key
+# Optional: mutual TLS
+korvet.broker.client-auth-required=true
+korvet.broker.trust-cert-file=/certs/ca.crt
+----
+
+=== Java Client Configuration
+
+Uncomment the SASL_SSL block in `Producer.java` / `Consumer.java`:
+
+[source,java]
+----
+props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL");
+props.put(SaslConfigs.SASL_MECHANISM, "SCRAM-SHA-256");
+props.put(SaslConfigs.SASL_JAAS_CONFIG,
+        "org.apache.kafka.common.security.scram.ScramLoginModule required "
+                + "username=\"alice\" password=\"alice-secret\";");
+props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, "/path/to/truststore.jks");
+props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, "changeit");
+----
+
+=== Python Client Configuration
+
+Uncomment the SASL_SSL block in `producer.py` / `consumer.py`:
+
+[source,python]
+----
+config.update({
+    "security.protocol": "SASL_SSL",
+    "sasl.mechanism": "SCRAM-SHA-256",
+    "sasl.username": "alice",
+    "sasl.password": "alice-secret",
+    "ssl.ca.location": "/path/to/ca.pem",
+})
+----
+
+== Troubleshooting
+
+=== Check Korvet Health
+
+Korvet exposes a health endpoint on port 8080:
+
+[source,bash]
+----
+curl http://localhost:8080/actuator/health
+----
+
+A `{"status":"UP"}` response means the broker is running.
+
+=== Connection Refused
+
+* Confirm the broker is up: `docker ps` and the health check above.
+* Confirm you are pointing at the right `bootstrap.servers` (`localhost:9092`).
+* If you run the client inside a container, `localhost` refers to that
+  container — use the broker's reachable host/advertised address instead.
+* Wait 10-15 seconds after starting Korvet before connecting.
+
+=== SASL Authentication Failures
+
+* Symptom (Java): `SaslAuthenticationException` / `Authentication failed`.
+* Symptom (Python): `SASL authentication error` from librdkafka.
+* Confirm `KORVET_BROKER_SASL_ENABLED=true` on the broker and that the client
+  uses the matching `sasl.mechanism` (default `SCRAM-SHA-256`).
+* Verify the username/password.
+* Remember that the `PLAIN` mechanism only works over TLS (`SASL_SSL`).
+
+=== TLS Handshake / Certificate Issues
+
+* Symptom (Java): `SSLHandshakeException` or `unable to find valid certification path`.
+* Symptom (Python): `SSL handshake failed` / `certificate verify failed`.
+* Make sure the client trusts the broker's CA: Java `ssl.truststore.location`,
+  Python `ssl.ca.location`.
+* The certificate hostname must match the host in `bootstrap.servers`.
+* For mutual TLS (`korvet.broker.client-auth-required=true`) the client must
+  also present its own certificate/keystore.
+
+=== Consumer Not Receiving Messages
+
+* If the group already committed offsets past the data, no new records are
+  delivered. Use a fresh `group.id`, or rely on
+  `auto.offset.reset=earliest` (set in both consumers) for a group with no
+  committed offset.
+* Confirm the producer actually wrote to the same topic (`client-demo`).
+* Check the broker logs for errors: `docker logs korvet`.
+
+== See Also
+
+* link:../kafka-cli/README.adoc[Kafka CLI Tools sample] — the simplest local stack
+* link:../filebeat/README.adoc[Filebeat & Logstash sample]
+* link:../README.adoc[All Samples]
+* link:../../README.adoc[Korvet Project README]

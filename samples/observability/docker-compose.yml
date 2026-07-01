@@ -13,7 +13,7 @@ services:
       - "6379:6379"
 
   korvet:
-    image: redisfield/korvet:0.18.0
+    image: redisfield/korvet:0.19.0
     command: server
     pull_policy: always
     ports:
@@ -24,6 +24,9 @@ services:
       - KORVET_BROKER_ADVERTISED_HOST=korvet
       - KORVET_REDIS_METRICS_ENABLED=true
       - KORVET_REDIS_METRICS_HISTOGRAM=true
+      # Catch-all topic defaults so the load test can create observability-demo on first use
+      - KORVET_TOPICS_0_NAME=*
+      - KORVET_TOPICS_0_AUTO_CREATE=true
     depends_on:
       - redis
 

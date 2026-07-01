@@ -1,0 +1,79 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  korvet:
+    image: redisfield/korvet:0.19.0
+    command: server
+    pull_policy: always
+    ports:
+      - "9092:9092"
+      - "8080:8080"
+    environment:
+      KORVET_REDIS_URI: redis://redis:6379
+      KORVET_BROKER_ADVERTISED_HOST: korvet
+      # --- Cold-tier offload (internal OffloadService -> Iceberg on S3/MinIO) ---
+      KORVET_STORAGE_REMOTE_PATH: s3://korvet-cold/warehouse
+      KORVET_STORAGE_REMOTE_S3_ENDPOINT: http://minio:9000
+      KORVET_STORAGE_REMOTE_S3_REGION: us-east-1
+      KORVET_STORAGE_REMOTE_S3_ACCESS_KEY_ID: minioadmin
+      KORVET_STORAGE_REMOTE_S3_SECRET_ACCESS_KEY: minioadmin
+      KORVET_STORAGE_REMOTE_S3_PATH_STYLE_ACCESS: "true"
+      # Run the offload worker often so the demo offloads quickly (default tick is 1m).
+      KORVET_STORAGE_WORKER_TICK_INTERVAL: 10s
+      # --- Topic configured for tiered storage ---
+      # remote-storage-enabled turns on offload for the topic.
+      # Small segment + local-retention thresholds force segments to seal and evict
+      # locally quickly so they land in the Iceberg cold tier during the demo.
+      KORVET_TOPICS_0_NAME: ${TOPIC:-events}
+      KORVET_TOPICS_0_PARTITIONS: ${PARTITIONS:-2}
+      KORVET_TOPICS_0_AUTO_CREATE: "true"
+      KORVET_TOPICS_0_REMOTE_STORAGE_ENABLED: "true"
+      KORVET_TOPICS_0_SEGMENT_BYTES: 1MB
+      KORVET_TOPICS_0_LOCAL_RETENTION_BYTES: 2MB
+      KORVET_TOPICS_0_RETENTION_BYTES: 1GB
+    depends_on:
+      - redis
+      - minio-init
+
+  kafka-tools:
+    image: apache/kafka:latest
+    command: sleep infinity
+    depends_on:
+      - korvet
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./data/minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/korvet-cold;
+      "
+
+  # Spark used only as an external query engine for the Iceberg cold tier.
+  spark:
+    image: apache/spark:3.5.0
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+    ports:
+      - "4040:4040"
+    volumes:
+      - ./spark_read_iceberg.py:/opt/spark-apps/spark_read_iceberg.py:ro
+      - ./catalog-jars:/opt/korvet-jars:ro

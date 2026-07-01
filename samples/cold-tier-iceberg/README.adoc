@@ -1,0 +1,240 @@
+= Cold-Tier Iceberg: Offload and External Query
+:toc:
+:icons: font
+
+== Overview
+
+This sample shows the read side of Korvet's tiered storage: how to *configure
+offload* of a topic to the Iceberg cold tier, and how to *query* that cold tier
+from an external engine (Spark).
+
+Cold-tier archival is *internal* to Korvet. Once a topic has remote storage
+enabled, Korvet's `OffloadService` and storage worker seal segments and write
+them to Iceberg tables on object storage automatically — there is no external
+archival job (no Flink, no Delta writer) to run. The cold tier is *Iceberg on
+S3*, with table metadata kept in a *Redis-backed Iceberg catalog*
+(`RedisCatalog`). External engines read it as ordinary Iceberg tables.
+
+The Docker Compose stack runs:
+
+* Redis — Korvet's backing store and the Iceberg catalog metastore
+* `redisfield/korvet:latest` — broker with offload to S3 enabled
+* MinIO — S3-compatible object store for the Iceberg warehouse
+* Spark — external query engine
+
+== Quick Start
+
+[source,bash]
+----
+cd samples/cold-tier-iceberg
+make up            # start Redis, Korvet (offload->MinIO), MinIO, Spark
+make produce       # write ~20k records so segments seal and offload
+make offload-status # confirm Parquet/metadata objects landed in MinIO
+make catalog-jars  # extract the RedisCatalog jar + deps from the Korvet image
+make query-spark   # query the Iceberg cold tier with Spark SQL
+----
+
+== Offload Configuration
+
+The broker enables offload through the `korvet.storage.remote.*` block and a
+topic with `remote-storage-enabled=true`. In this sample it is set via
+environment variables in `docker-compose.yml`:
+
+[cols="2,3",options="header"]
+|===
+| Property (env var) | Value
+
+| `korvet.storage.remote.path` (`KORVET_STORAGE_REMOTE_PATH`)
+| `s3://korvet-cold/warehouse`
+
+| `korvet.storage.remote.s3.endpoint` (`KORVET_STORAGE_REMOTE_S3_ENDPOINT`)
+| `http://minio:9000`
+
+| `korvet.storage.remote.s3.region` (`KORVET_STORAGE_REMOTE_S3_REGION`)
+| `us-east-1`
+
+| `korvet.storage.remote.s3.access-key-id` (`KORVET_STORAGE_REMOTE_S3_ACCESS_KEY_ID`)
+| `minioadmin`
+
+| `korvet.storage.remote.s3.secret-access-key` (`KORVET_STORAGE_REMOTE_S3_SECRET_ACCESS_KEY`)
+| `minioadmin`
+
+| `korvet.storage.remote.s3.path-style-access` (`KORVET_STORAGE_REMOTE_S3_PATH_STYLE_ACCESS`)
+| `true` (required for MinIO)
+
+| `korvet.storage.worker.tick-interval` (`KORVET_STORAGE_WORKER_TICK_INTERVAL`)
+| `10s` (default `1m`; lowered so the demo offloads quickly)
+|===
+
+Per-topic offload + segment/retention thresholds:
+
+[cols="2,3",options="header"]
+|===
+| Property (env var) | Value
+
+| `remote-storage-enabled` (`KORVET_TOPICS_0_REMOTE_STORAGE_ENABLED`)
+| `true` — turns on offload for the topic
+
+| `segment.bytes` (`KORVET_TOPICS_0_SEGMENT_BYTES`)
+| `1MB` — small so segments seal often (demo only)
+
+| `local.retention.bytes` (`KORVET_TOPICS_0_LOCAL_RETENTION_BYTES`)
+| `2MB` — small so sealed segments evict from Redis after offload
+
+| `retention.bytes` (`KORVET_TOPICS_0_RETENTION_BYTES`)
+| `1GB` — total retention across local + cold tiers
+|===
+
+For production, use realistic sizes (segments in the tens-to-hundreds of MB and
+local retention sized to your hot working set). `local.retention.*` controls how
+much stays in Redis; `retention.*` controls total retention before data is
+deleted from the cold tier as well.
+
+== Querying the Cold Tier
+
+Korvet maps each Kafka topic to *one Iceberg table* in a namespace named after
+`korvet.namespace` (default `korvet`). Topic `events` becomes table
+`korvet.events`. Partitions of the topic become Iceberg partitions of the table
+(partitioned by `stream_key`, sorted by `message_ts`).
+
+=== Catalog configuration contract
+
+An external engine connects to the same Redis-backed catalog Korvet writes to.
+`RedisCatalog` extends Iceberg's `BaseMetastoreCatalog`, so it is a standard
+Iceberg `catalog-impl`:
+
+[cols="2,3",options="header"]
+|===
+| Catalog property | Value (must match the Korvet deployment)
+
+| `catalog-impl`
+| `com.redis.korvet.storage.tiered.iceberg.catalog.RedisCatalog`
+
+| `uri`
+| Redis URI Korvet uses (here `redis://redis:6379`)
+
+| `warehouse`
+| Same as `korvet.storage.remote.path` (here `s3://korvet-cold/warehouse`)
+
+| `key-prefix`
+| `{korvet.namespace}:storage:tiered:iceberg` — default `korvet:storage:tiered:iceberg`
+
+| `io-impl`
+| `org.apache.iceberg.aws.s3.S3FileIO`
+
+| `s3.endpoint`, `s3.access-key-id`, `s3.secret-access-key`, `s3.path-style-access`, `client.region`
+| Same S3 settings Korvet uses
+|===
+
+NOTE: The `key-prefix` is *not* the literal `iceberg` default — Korvet derives it
+from its namespace. If you query with the wrong prefix the catalog will appear
+empty.
+
+=== Table schema
+
+[cols="2,2,3",options="header"]
+|===
+| Column | Type | Meaning
+
+| `stream_key` | string (required, partition) | partition stream key
+| `segment_id` | long (required) | sealed segment number
+| `message_id` | string (required) | Redis stream message ID
+| `message_ts` | long (required, sort) | append-time ordering (ms)
+| `fields`     | map<string, binary> (optional) | original Redis stream message fields
+|===
+
+The `fields` column is produced by the default `StreamFieldsRowCodec`. A Kafka
+record's value is typically under the `value` key of that map.
+
+=== Spark
+
+`make query-spark` runs `spark_read_iceberg.py`, which registers the catalog and
+runs `SHOW NAMESPACES`, `SHOW TABLES`, `DESCRIBE`, and sample/count queries. The
+catalog wiring (also see the script):
+
+[source,python]
+----
+.config("spark.sql.catalog.korvet", "org.apache.iceberg.spark.SparkCatalog")
+.config("spark.sql.catalog.korvet.catalog-impl",
+        "com.redis.korvet.storage.tiered.iceberg.catalog.RedisCatalog")
+.config("spark.sql.catalog.korvet.uri", "redis://redis:6379")
+.config("spark.sql.catalog.korvet.warehouse", "s3://korvet-cold/warehouse")
+.config("spark.sql.catalog.korvet.key-prefix", "korvet:storage:tiered:iceberg")
+.config("spark.sql.catalog.korvet.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+.config("spark.sql.catalog.korvet.s3.endpoint", "http://minio:9000")
+.config("spark.sql.catalog.korvet.s3.path-style-access", "true")
+----
+
+[NOTE]
+====
+Trino is not included as a query engine. Its Iceberg connector only supports a
+fixed set of catalog types (`hive_metastore`, `glue`, `jdbc`, `rest`, `nessie`,
+`snowflake`) and has no generic custom-catalog-impl mechanism, so it cannot load
+the Redis-backed `RedisCatalog`. Use Spark, Flink, or any Iceberg client that
+honors `catalog-impl` to query the cold tier.
+====
+
+=== Getting the RedisCatalog onto the engine classpath
+
+`RedisCatalog` ships in the `korvet-storage-tiered-iceberg` jar. External Spark
+needs that jar plus its runtime dependencies (Lettuce, redis-commons, Gson) on
+the classpath. `make catalog-jars` extracts them from the
+`redisfield/korvet:latest` image into `./catalog-jars`, which is mounted into the
+Spark container at `/opt/korvet-jars`.
+
+IMPORTANT: The Iceberg jars themselves come from Spark's `--packages`
+(`iceberg-spark-runtime`, `iceberg-aws-bundle`), not from the extracted set, to
+avoid two copies of Iceberg on the classpath. If you see a version conflict,
+align the `iceberg-spark-runtime` version in the Makefile's `SPARK_PACKAGES` with
+the `iceberg-core` version bundled in the Korvet image.
+
+== Services
+
+* Korvet Kafka endpoint: `localhost:9092`
+* Korvet health: http://localhost:8080/actuator/health
+* MinIO S3 endpoint: http://localhost:9000
+* MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`)
+
+== Data Flow
+
+. Producer writes records to the `events` topic (Kafka protocol).
+. Korvet appends records to Redis Streams (hot tier).
+. When a segment reaches `segment.bytes`, it is sealed.
+. The storage worker (every `tick-interval`) offloads sealed segments to Iceberg
+  on S3 and registers them in the Redis-backed catalog.
+. Once a stream exceeds `local.retention.bytes`, offloaded segments are evicted
+  from Redis; reads transparently fall back to the cold tier.
+. Spark reads the Iceberg tables directly from the catalog + S3.
+
+== Troubleshooting
+
+Nothing in MinIO after producing::
+Offload runs on the storage worker tick (`10s` here). Give it a few seconds and
+re-run `make offload-status`. Confirm the topic shows `remote-storage-enabled`
+and that enough data was produced to exceed `segment.bytes` and
+`local.retention.bytes`. Check `make logs-korvet` for offload activity.
+
+`make catalog-jars` extracts nothing::
+Ensure the image is pulled (`docker pull redisfield/korvet:latest`). The target
+copies any jar matching the known names; if the image layout changed, run
+`docker run --rm --entrypoint sh redisfield/korvet:latest -c 'find / -name "*.jar"'`
+to locate them and copy the `korvet-storage-tiered-iceberg`, `lettuce-core`,
+`redis-commons`, and `gson` jars into `./catalog-jars`.
+
+Spark shows no tables / empty namespace::
+The `key-prefix` must match Korvet's namespace-derived value
+(`{namespace}:storage:tiered:iceberg`). With a non-default `korvet.namespace`,
+set `KORVET_CATALOG_KEY_PREFIX` and `ICEBERG_NAMESPACE` for the Spark job.
+
+`ClassNotFoundException: com.redis...RedisCatalog`::
+The catalog jars were not on the classpath. Run `make catalog-jars` and confirm
+`./catalog-jars` is non-empty before `make query-spark`.
+
+Iceberg version conflict (NoSuchMethodError / linkage errors)::
+Align `SPARK_PACKAGES` `iceberg-spark-runtime` with the `iceberg-core` version in
+the Korvet image (see "Getting the RedisCatalog onto the engine classpath").
+
+S3 `PathStyleAccessNotEnabled` / 403 against MinIO::
+MinIO requires `s3.path-style-access=true` and a matching endpoint
+(`http://minio:9000` inside the compose network, `http://localhost:9000` from the
+host).
