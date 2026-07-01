@@ -248,13 +248,14 @@ korvet:
     # JVM thread count (default: 250, async version uses 50)
     BPL_JVM_THREAD_COUNT: 50
 
-    # JVM memory settings
-    JAVA_TOOL_OPTIONS: -XX:MaxDirectMemorySize=512m
+    # JVM memory settings. Use JAVA_OPTS, not JAVA_TOOL_OPTIONS: the broker's baked
+    # -XX:MaxDirectMemorySize default is applied after JAVA_TOOL_OPTIONS and would override it.
+    JAVA_OPTS: -Xms2g -Xmx2g -XX:MaxDirectMemorySize=512m
 
     # Enable Redis metrics
     KORVET_REDIS_METRICS_ENABLED: true
     KORVET_REDIS_METRICS_HISTOGRAM: true
-  mem_limit: 2g
+  mem_limit: 4g
 ----
 
 == Troubleshooting

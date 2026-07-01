@@ -209,6 +209,55 @@ make up
 make spark-submit
 ----
 
+=== link:clients/README.adoc[Kafka Client Examples (Java + Python)]
+
+Standard Kafka producer/consumer examples against Korvet, with SASL/TLS
+configuration and per-client troubleshooting. Korvet speaks the Kafka wire
+protocol, so these are ordinary Kafka clients.
+
+**Includes:**
+
+* Java producer/consumer (`kafka-clients`) with a consumer group and manual commit
+* Python producer/consumer (`confluent-kafka`) with manual offset management
+* Commented `SASL_SSL` (SCRAM-SHA-256 + TLS) blocks for both languages
+* Server-side authentication/TLS env vars and a per-client troubleshooting guide
+
+**Use Cases:**
+
+* Wiring application code to Korvet
+* Authentication and TLS setup
+* Consumer group and offset-management patterns
+
+=== link:cold-tier-iceberg/README.adoc[Cold-Tier Iceberg: Offload + External Query]
+
+Configure a topic for cold-tier offload (internal `OffloadService` → Iceberg on
+S3/MinIO) and query the Iceberg cold tier from Spark or Trino against Korvet's
+Redis-backed Iceberg catalog.
+
+**Includes:**
+
+* Korvet configured for offload to MinIO (`korvet.storage.remote.*`, per-topic thresholds)
+* Spark SQL reader using the `RedisCatalog` (`catalog-impl`)
+* Trino catalog properties for the same cold tier
+* Helper to extract the catalog jar from the Korvet image onto the engine classpath
+
+**Use Cases:**
+
+* Tiered-storage / offload configuration
+* Read-side analytics over the Iceberg cold tier
+* Spark and Trino integration with the Redis-backed catalog
+
+**Quick Start:**
+
+[source,bash]
+----
+cd samples/cold-tier-iceberg
+make up
+make produce
+make catalog-jars
+make query-spark
+----
+
 == Prerequisites
 
 All samples require:

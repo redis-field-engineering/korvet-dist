@@ -5,7 +5,7 @@ services:
       - "6379:6379"
 
   korvet:
-    image: redisfield/korvet:0.18.0
+    image: redisfield/korvet:0.19.0
     command: server
     pull_policy: always
     ports:
